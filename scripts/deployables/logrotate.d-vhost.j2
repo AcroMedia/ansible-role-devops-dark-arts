@@ -1,0 +1,31 @@
+# Created by acro-add-website.sh
+{{ project_log_dir }}/{{ WEBSERVER }}-*.log {
+  weekly
+	missingok
+	rotate 52
+	compress
+	delaycompress
+	notifempty
+	create 0640 {{ WEBSERVER_PROCESS_OWNER }} adm
+	sharedscripts
+	prerotate
+		if [ -d /etc/logrotate.d/httpd-prerotate ]; then \
+			run-parts /etc/logrotate.d/httpd-prerotate; \
+		fi \
+	endscript
+	postrotate
+		[ -s /run/nginx.pid ] && kill -USR1 `cat /run/nginx.pid`
+	endscript
+}
+{{ fpm_error_log }} {
+	rotate 52
+	weekly
+	missingok
+	notifempty
+	compress
+  create 0640 {{ serviceaccount }} adm
+	delaycompress
+	postrotate
+		[ -x {{ fpm_logrotate_postrotate }} ] && {{ fpm_logrotate_postrotate }}
+	endscript
+}

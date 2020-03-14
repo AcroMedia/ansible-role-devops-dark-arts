@@ -1,0 +1,103 @@
+#!/bin/bash
+if [[ $# -ne 2 ]]
+	then
+	echo "Drops and recreates specified the database, and then loads in the specified MysqlDump file"
+	echo "Usage: $(basename "$0") <dumpfile> <target_database>"
+  exit 1
+fi
+
+# I always forget which order these go in... my original order seemed backwards.
+# Let it work both ways.
+if [[ -f "$1" && ! (-f "$2") ]]; then
+  DBNAME="$2"
+  RESTOREFROM="$1"
+elif [[ -f "$2" && ! (-f "$1") ]]; then
+  DBNAME="$1"
+  RESTOREFROM="$2"
+else
+  echo "No valid dump file specified. Aborting"
+  exit 1
+fi
+
+# Do some filename checking
+if [[ "$RESTOREFROM" =~ \.mysql\.gz$ ]]; then
+  IS_GZIPPED=1
+elif [[ "$RESTOREFROM" =~ \.sql\.gz$ ]]; then
+  IS_GZIPPED=1
+elif [[ "$RESTOREFROM" =~ \.mysql$ ]]; then
+  IS_GZIPPED=0
+elif [[ "$RESTOREFROM" =~ \.sql$ ]]; then
+  IS_GZIPPED=0
+else
+  echo "Dump file must end in '.[my]sql[.gz]'. Aborting further actions."
+  exit 1
+fi
+
+# Be able to extract compressed dump files
+if [ $IS_GZIPPED -eq 1 ]; then
+  GUNZIPCMD="gzip -cdf"
+else
+  GUNZIPCMD=""
+fi
+
+echo ""
+echo "About to drop database: $DBNAME"
+echo "..and recreate it from: $RESTOREFROM"
+echo -n "Enter [y] to continue, or anything else to abort: "
+read -r DRAMATIC_PAUSE
+if [[ $DRAMATIC_PAUSE != 'y' ]]; then
+  echo "Aborting."
+  exit 0
+fi
+echo "Dropping $DBNAME..."
+mysql -e "drop database $DBNAME;"|| {
+  echo "Drop command failed. Aborting further actions."
+  exit 1
+}
+echo "Recreating $DBNAME..."
+mysql -e "create database $DBNAME;" || {
+  echo "Create command failed. Aborting further actions."
+  exit 1
+}
+
+echo "Restoring from $RESTOREFROM..."
+
+if type ionice > /dev/null 2>&1; then
+  NICECMD="nice -n 19 ionice -c2 -n7"
+else
+  NICECMD="nice -n 19"
+fi
+
+
+# See if we can use PV for feedback.
+PVCMD=""
+if type pv >/dev/null 2>&1; then
+  if [ $IS_GZIPPED -eq 0 ]; then
+    DUMPBYTES=$(wc -c "$RESTOREFROM" | awk '{print $1}')
+    if [[ "$DUMPBYTES" =~ ^-?[0-9]+$ ]]; then
+      DUMP_MB=$(( DUMPBYTES * 1000 / 1073741824 ))
+      echo "Restore size: $DUMP_MB MB"
+      PVCMD="pv -ptrb -s $DUMPBYTES"
+    else
+      echo "Progress feedback is not available. File size could not be determined."
+    fi
+  else
+    echo "Progress feedback is not available for gzipped mysql dumps. Gzip lies about large file sizes."
+  fi
+else
+  echo "Progress feedback is not available. PV utility is not installed or not in path."
+fi
+
+
+# Here's where all the magic happens.
+cat "$RESTOREFROM" |
+( if [ ! -z "$GUNZIPCMD" ]; then $GUNZIPCMD; else cat -; fi ) |
+( if [ ! -z "$PVCMD" ]; then $PVCMD; else cat -; fi ) |
+  $NICECMD mysql -D "$DBNAME" || {
+  echo "Restore failed."
+  exit 1
+}
+
+echo "All done" 
+echo ""
+

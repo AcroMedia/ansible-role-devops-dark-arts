@@ -1,0 +1,32 @@
+[{{ pool_name }}]
+user = {{ service_user }}
+group = {{ service_group }}
+listen = {{ socket_file }}
+listen.owner = {{ listen_owner }}
+listen.group = {{ listen_group }}
+;listen.mode = 0660
+;listen.allowed_clients = 127.0.0.1
+
+;pm.dynamic: ready for action but uses way more memory -- use for high traffic sites
+;pm.ondemand: only runs when needed -- use for dev, staging, low traffic sites
+pm = ondemand
+
+pm.max_children = 5
+pm.start_servers = 2
+pm.min_spare_servers = 1
+pm.max_spare_servers = 3
+pm.max_requests = 500
+;request_terminate_timeout = 0
+catch_workers_output = no
+chdir = /
+php_admin_flag[log_errors] = on
+php_admin_value[error_log] = {{ error_log }}
+php_admin_value[max_execution_time] = 300
+php_admin_value[default_socket_timeout] = 300
+security.limit_extensions = .php
+php_admin_value[open_basedir] = "{{ project_dir }}/:/tmp/"
+php_value[newrelic.appname] = "{{ newrelic_appname }}"
+php_flag[expose_php] = off
+php_admin_value[upload_max_filesize] = 8M
+php_admin_value[post_max_size] = 8M
+php_admin_value[memory_limit] = 128M

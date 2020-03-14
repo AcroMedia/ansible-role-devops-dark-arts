@@ -1,0 +1,39 @@
+; -------------------------------------------------
+; This file has tabs, trailing spaces, too many ending newlines, 
+; and lines that contain nothing but whitespace.
+; If your editor removes / replaces such things, you'll break the tests.
+; -------------------------------------------------
+; The following line is blank. 
+
+; The following line is full of spaces
+                                 
+; The following line is full of tabs
+										
+; The following line is mixed spaces and tabs
+	   		   
+# Hash comment.
+   # Hash comment with leading space
+			# Hash comment with leading tabs
+	   		   	# Hash comment with mixed tabs and spaces
+   		   	# Hash comment with mixed tabs and spaces
+			
+Not a comment. This is one of only 4 lines that should be preserved by strip-comments.
+                    Not a comment, with leading space. This is one of only 4 lines that should be preserved by strip-comments.
+				Not a comment, with leading tabs. This is one of only 4 lines that should be preserved by strip-comments.
+	 	 	 	 Not a comment, with mixed tabs and spaces This is one of only 4 lines that should be preserved by strip-comments.
+; Ini style comment
+            ; Ini style comment with leading space.
+				; Ini style comment with leading tabs
+    	 	  	     ; Ini style comment with mixed tabs + spaces
+
+// Double slash commment
+     // Double slash commment with leading space
+					// Double slash commment with leading tabs
+	 	 	   // Double slash commment with mixed
+
+
+; Lots of ending newlines follow ....
+
+
+
+

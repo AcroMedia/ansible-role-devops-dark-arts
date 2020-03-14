@@ -1,0 +1,31 @@
+#!/bin/bash
+# This is a bash include. White space is not trivial.
+
+# For Red Hat 6 + Apache + PHP 5.4 (ie the old eikon server)
+# 5.5 is indicated by the /etc/php5/* style directory, as opposed to Ondrej's /etc/php/X.Y/* style directory.
+
+PHP_VERSION="5.6"
+PHP_FPM_SERVICE_NAME="php-fpm"
+readonly PHP_FPM_LOGROTATE_POSTROTATE='(test -e /var/run/php-fpm/php-fpm.pid  && /bin/kill -SIGUSR1 "$(cat /var/run/php-fpm/php-fpm.pid 2>/dev/null)" 2>/dev/null) || true'
+readonly VHOSTLOGROOT="/var/log/vhosts"
+readonly HOMEROOT="/home"
+readonly NGINX_SITES_AVAILABLE="/etc/nginx/sites-available"
+readonly NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
+readonly APACHE_SITES_AVAILABLE="/etc/httpd/conf.d"
+readonly APACHE_SITES_ENABLED="/tmp" # This is a throwaway. Red hat doesn't do the symlinked style like Ubuntu.
+readonly NGINX_CONF_TEMPLATE="$ACROCONFROOT/nginx-vhost-template-d7${VHOST_CONF_STUB}-conf.j2"
+readonly APACHE_CONF_TEMPLATE="$ACROCONFROOT/apache-vhost-template-d7${VHOST_CONF_STUB}-conf.j2"
+SSLDIR="/usr/local/ssl"
+readonly CERTSDIR="$SSLDIR/certs"
+readonly KEYSDIR="$SSLDIR/private"
+POOLDIR="/etc/php-fpm.d"
+readonly FPM_CONF_TEMPLATE="$ACROCONFROOT/php5.6-fpm-pool-conf-template.j2"
+readonly SETTINGS_LOCAL_TEMPLATE="$ACROCONFROOT/drupal-settings-local-php.j2"
+readonly AUTODEPLOY_HOOKS_SRC="/usr/local/src/acro/auto-deploy-git-hooks"
+readonly PRE_RECEIVE_SRC="$AUTODEPLOY_HOOKS_SRC/remote-node/pre-receive"
+readonly POST_RECEIVE_SRC="$AUTODEPLOY_HOOKS_SRC/remote-node/post-receive"
+readonly MAX_ACCOUNT_STRING_LENGTH=32
+readonly MAX_MYSQL_DBNAME_LENGTH=64
+readonly MAX_MYSQL_USERNAME_LENGTH=16
+readonly LOGROTATE_CONF_TEMPLATE="$ACROCONFROOT/logrotate.d-vhost.j2"
+readonly WEBSERVER_PROCESS_OWNER="apache"

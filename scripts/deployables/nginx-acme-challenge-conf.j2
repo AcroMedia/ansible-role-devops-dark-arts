@@ -1,0 +1,7 @@
+# Temporary nginx config to get the ACME cert authenticated.
+# Will be replaced by the real config once the cert has been installed.
+server {
+  listen 80;
+  server_name {{ fqdn }};
+  include /etc/nginx/includes/letsencrypt-acme-challenge.conf;
+}

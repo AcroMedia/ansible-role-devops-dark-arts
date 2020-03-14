@@ -1,0 +1,330 @@
+#!/bin/bash -u
+# ==============================================================================
+# This is an iptables wrapper that allows traffic to the specified port from
+# specified host, and denies connections to that port from all other hosts.
+# See https://git.acromedia.com/acro/infrastructure/wikis/acro-iptables-restrict-port
+# ------------------------------------------------------------------------------
+
+# Config
+readonly VERBOSE=1
+readonly BAKFILE="$HOME/iptables.save.$(date +%Y%m%d%H%M%S)"
+BOLD=$(tput bold 2>/dev/null) || BOLD='\033[1;33m' # orange, if tput isnt available.
+UNBOLD=$(tput sgr0 2>/dev/null) || UNBOLD='\033[m'
+
+function usage() {
+  cerr "See https://git.acromedia.com/acro/infrastructure/wikis/acro-iptables-restrict-port for full documentation."
+  cerr ""
+  cerr "Usage:"
+  cerr "  $(basename "$0") <PORT_TO_PROTECT> <CIDR_TO_ALLOW_FROM>  [--chain NEWCHAIN] [--protocol udp]"
+  cerr ""
+  cerr "Exmaples:"
+  cerr "  Allow single ip address to access TCP port 6379:"
+  cerr "  \$ $(basename "$0") 6379 192.168.10.3 --chain REDIS"
+  cerr ""
+  cerr "  Allow a whole subnet to access TCP port 3306:"
+  cerr "  \$ $(basename "$0") 3306 192.168.10.0/24 --chain MYSQL"
+  cerr ""
+  cerr "  Allow a subnet to access UDP port 1514:"
+  cerr "  \$ $(basename "$0") 1514 192.168.1.0/24 --chain OSSEC-MAIN --protocol udp"
+  cerr ""
+  cerr "If '--chain XXX' is not provided, the script will create rules in a chain named ACRO."
+  cerr ""
+}
+
+
+function main() {
+
+  if [ $EUID -ne 0 ]; then
+     err "This script must be run as root"
+     exit 1
+  fi
+
+  # Sanity checks.
+  test -x /usr/local/sbin/optional-parameter-exists || { err "The optional-parameter-exists utility was not found in PATH. Aborting."; exit 1; }
+  test -x /usr/local/sbin/require-named-parameter || { err "The require-named-parameter was not found in PATH. Aborting."; exit 1; }
+  type iptables >/dev/null 2>&1 || { err "The iptables utility was not found in PATH. Aborting."; exit 1; }
+  type iptables-save >/dev/null 2>&1 || { err "The iptables-save utility was not found in PATH. Aborting."; exit 1; }
+  type service >/dev/null 2>&1 || { err "Service not found in PATH. Aborting."; exit 1; }
+  iptables --list-rules > /dev/null 2>&1 || { err "This iptables does not support the '--list-rules' option. You will need to set up rules manually."; exit 1; }
+
+  if [ "$#" -lt 2 ]; then
+    usage
+    exit 1
+  fi
+
+  PORT_NUM="$1"
+  if ! is_sane_port_num "$PORT_NUM"; then
+    exit 1
+  fi
+
+  ALLOW_FROM="$2"
+  if ! is_sane_ip_or_cidr "$ALLOW_FROM"; then
+    exit 1
+  fi
+
+  PROTOCOL='tcp'
+  if /usr/local/sbin/optional-parameter-exists "--protocol" "$@"; then
+    PROTO_TEMP="$(/usr/local/sbin/require-named-parameter '--protocol' "$@")"
+    if [[ "$PROTO_TEMP" == 'tcp' ]]; then
+      : # OK - TCP is the default protocol
+    elif [[ "$PROTO_TEMP" == 'udp' ]]; then
+      PROTOCOL='udp'
+    else
+      err "Sorry, I only handle 'tcp' and 'udp' protocols. Unhandled protocol: $PROTO_TEMP"
+      exit 1
+    fi
+  fi
+
+
+
+  DEFAULT_CHAIN_NAME="ACRO"
+  if /usr/local/sbin/optional-parameter-exists "--chain" "$@"; then
+    CHAIN_NAME="$(/usr/local/sbin/require-named-parameter '--chain' "$@")"
+  else
+    CHAIN_NAME="$DEFAULT_CHAIN_NAME"
+  fi
+  if ! is_sane_chain_name "$CHAIN_NAME"; then
+    exit 1
+  fi
+
+
+  # The order of these ensures that rules get created safely, and don't interrupt existing traffic
+  assert_iptables_chain "$CHAIN_NAME"
+  verify_or_allow_ip "$CHAIN_NAME" "$ALLOW_FROM"
+  verify_or_allow_ip "$CHAIN_NAME" "127.0.0.1/32" # Make sure to always allow localhost
+  verify_or_add_drop_rule "$CHAIN_NAME"
+  verify_or_add_input_rule "$CHAIN_NAME" "$PORT_NUM" "${PROTOCOL}"
+
+  if changes_were_made; then
+    save_iptables
+  else
+    echo "No changes were made."
+  fi
+  echo "To see your current iptables: iptables --list --numeric --line-numbers "
+
+}
+
+function is_sane_ip_or_cidr () {
+  cerr "@TODO: Finish is_sane_ip_or_cidr()."
+  return 0
+}
+
+
+function is_sane_chain_name () {
+  local ARG
+  ARG="$1"
+  if [[ ! "$ARG" =~ ^[A-Za-z]+[A-Za-z0-9_-]+$ ]]; then
+    err "Chain name contains invalid characters"
+    return 1
+  fi
+  if [ "${#ARG}" -gt 20 ]; then
+    err "Chain name is too long"
+    return 2
+  fi
+  if [[ "$ARG" == 'INPUT' ]] \
+  || [[ "$ARG" == 'FORWARD' ]] \
+  || [[ "$ARG" == 'OUTPUT' ]] \
+  || [[ "$ARG" == 'DROP' ]] \
+  || [[ "$ARG" == 'REJECT' ]] \
+  || [[ "$ARG" == 'ACCEPT' ]] \
+  || [[ "$ARG" == 'PREROUTING' ]] \
+  || [[ "$ARG" == 'POSTROUTING' ]] \
+  || [[ "$ARG" == 'QUEUE' ]] \
+  || [[ "$ARG" == 'RETURN' ]]; then
+    err "Chain name cannot be a reserved word."
+    return 3
+  fi
+  return 0
+}
+
+function is_sane_port_num () {
+  local PORT_NUM
+  PORT_NUM="$1"
+  if ! is_positive_integer "$PORT_NUM"; then
+    err "Port number needs to be a positive integer"
+    return 1
+  fi
+  if [ "$PORT_NUM" -gt 65535 ]; then
+    err "Port number needs to be <= 65535"
+    return 2
+  fi
+  if [ "$PORT_NUM" -eq 22 ]; then
+    err "The default SSH port is not allowed to be managed by this script. It's too easy to lock yourself out."
+    return 3
+  fi
+  return 0
+}
+
+function verbose() {
+  if [ "$VERBOSE" -eq 1 ]; then
+    echo "$@"
+  fi
+}
+
+function back_up_current_iptables() {
+  test -f "$BAKFILE" || {
+    echo "Backing up current configuration to $BAKFILE"
+    iptables-save > "$BAKFILE" || {
+      err "Could not back up iptables."
+      exit 1
+    }
+  }
+}
+
+function assert_iptables_chain() {
+  local CHAIN="$1"
+  if ! test "$CHAIN"; then
+    err "assert_iptables_chain: Missing chain name."
+    exit 1
+  fi
+  if iptables --list | grep -q -E -- " ${CHAIN} "; then
+    verbose "Chain $CHAIN already exists."
+  else
+    back_up_current_iptables
+    verbose "Creating chain: $CHAIN"
+    iptables --new-chain "$CHAIN" || {
+      exit 1
+    }
+  fi
+}
+
+function verify_or_allow_ip() {
+  local CHAIN="$1"
+  local IPADDR="$2"
+
+  if test -z "$IPADDR"; then
+    err "Please enter the IP address or network (in CIDR format) you want to allow connections from."
+    exit 1
+  fi
+
+  RULECHECKOUTPUT="$(iptables --list-rules "$CHAIN")" || {
+    err "List rules command failed. You will probably need to set up rules manually."
+    exit 1
+  }
+
+  if echo "$RULECHECKOUTPUT" | grep -q -E -- " ${IPADDR}( |/)"; then
+    verbose "ACCEPT $IPADDR already exists."
+  else
+    back_up_current_iptables
+    verbose "Prepending ACCEPT $IPADDR rule to $CHAIN chain"
+    iptables --insert "$CHAIN_NAME" --src "$IPADDR" --jump ACCEPT || {
+      exit 1
+    }
+  fi
+}
+
+function verify_or_add_drop_rule() {
+  local CHAIN="$1"
+  if iptables --list-rules "$CHAIN" | grep -- "-A ${CHAIN} -j DROP" > /dev/null; then
+    verbose "DROP rule already exists."
+  else
+    back_up_current_iptables
+    verbose "Appending DROP rule to $CHAIN chain."
+    iptables -A "$CHAIN" -j DROP || {
+      exit 1
+    }
+  fi
+}
+
+function verify_or_add_input_rule() {
+  local CHAIN="$1"
+  local PORT="$2"
+  local PROTOCOL="$3"
+  if iptables --list-rules INPUT | grep -- "-A INPUT -p ${PROTOCOL} -m .* ${PORT} -j" > /dev/null; then
+    verbose "INPUT jump rule to $CHAIN already exists."
+  else
+    back_up_current_iptables
+    verbose "Prepending $CHAIN jump rule to INPUT chain."
+    iptables --insert INPUT --match "${PROTOCOL}" --protocol "${PROTOCOL}" --dport "$PORT" --jump "$CHAIN" || {
+      exit 1
+    }
+  fi
+}
+
+function is_centos_7() {
+  if type firewall-cmd > /dev/null 2>&1; then
+    true
+  else
+    false
+  fi
+}
+
+function debian_iptables_persistent_exists() {
+  # iptables-persistent is a debian package that loads saved iptables rules at boot-time.
+  # It's not there by default, and really, UFW is a better option for that environment.
+  # This is only for when UFW isn't being used.
+  if dpkg --list  2>&1| grep "iptables-persistent" > /dev/null && test -f /etc/iptables/rules.v4; then
+    true
+  else
+    false
+  fi
+}
+
+function is_probably_debian() {
+  if dpkg --list > /dev/null 2>&1; then
+    true
+  else
+    false
+  fi
+}
+
+function changes_were_made() {
+  # We are inferring changes by the presence of a backup file. It only gets created when a rule is added.
+  if test -f "$BAKFILE"; then
+    true
+  else
+    false
+  fi
+}
+
+function save_iptables() {
+  CMDRESULT=999  # default fail - the commands below will change this to 0 on success.
+  if is_centos_7; then
+    echo "Saving firewall rules... "
+    firewall-cmd --runtime-to-permanent; CMDRESULT=$?
+  elif debian_iptables_persistent_exists; then
+    echo "Saving firewall rules... "
+    iptables-save > /etc/iptables/rules.v4; CMDRESULT=$?
+    [ $CMDRESULT -eq 0 ] && echo "OK"
+  else
+    service iptables save; CMDRESULT=$?
+  fi
+  [ $CMDRESULT -eq 0 ] || {
+    echo "*** Autosave of iptables failed. Remember to save your iptables rules, or they will be lost on next reload."
+    if is_probably_debian && ! debian_iptables_persistent_exists; then
+      echo "*** Installing the 'iptables-persistent' package will accomplish this."
+    fi
+  }
+}
+
+function err () {
+  bold_feedback "Err" "$@"
+}
+
+# Requires Two arguments
+function bold_feedback () {
+  local PREFIX
+  PREFIX="${1:-"bold_feedback received no arguments"}"
+  shift || true
+  local MESSAGE="$*"
+  cerr "${BOLD}${PREFIX}:${UNBOLD} ${MESSAGE}"
+}
+
+function info () {
+  cerr "$@"
+}
+
+function cerr () {
+  >&2 echo "$@"
+}
+
+function is_positive_integer() {
+  local WHAT="$*"
+  if [[ "$WHAT" =~ ^[1-9][0-9]*$ ]]; then
+    true
+  else
+    false
+  fi
+}
+
+main "$@"

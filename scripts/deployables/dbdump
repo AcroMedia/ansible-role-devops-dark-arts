@@ -1,0 +1,147 @@
+#!/bin/bash
+
+umask 077 # Dumps are almost guarnateed to contain sensitive info. Don't let anyone else read the files we create.
+
+
+# This is just a simple dbdump wrapper to save a lot of typing.
+# Outputs to a file that looks like "mydbname.YYYY-mm-DD-HHMM.mysql"
+# If a second argument is specified, that gets injected in to the filename too.
+# It's expected that your MySQL login credentials are stored in your local
+# ~/.my.cnf file, which should have 0600 permissions.
+
+function cerr () {
+  >&2 echo "$*"
+}
+
+function main () {
+  # Create defaults
+  DBNAME=${DBNAME:-} # Accept DBNAME as an environment variable
+  COMPRESS=${COMPRESS:-0} # Accept COMPRESS as an environment variable
+  TAG=""
+
+  PASS_THROUGH_ARRAY=()  # Anything that we dont use ourselves, pass through to mysqldump (such as --skip-extended-insert, etc)
+  PASS_THROUGH_COUNT=0
+
+  # Gobble the arguments and check for options.
+  while [ $# -gt 0 ]; do
+  	param="$1"
+    #echo "param: $param"
+    case $param in
+      "-z"|"--gzip"|"--compress")
+        COMPRESS=1
+        #echo "Compressing: Yes"
+        ;;
+  		*)
+        if [[ "$param" =~ ^-+ ]]; then
+          : # any undefined parameters that start with a dash will be passed through to mysqldump.
+          PASS_THROUGH_ARRAY+=("$param")
+          PASS_THROUGH_COUNT=$((PASS_THROUGH_COUNT+1))
+        else
+          if [[ ! "$DBNAME" ]]; then
+            # The first non-dash parameter will be used as the db name.
+            DBNAME="$param"
+            #echo "DBNAME: $DBNAME"
+          else
+            # Anything else will be treated as a tag. The last tag provided will be the only one used.
+            # Since we already took the first argument as the DB name to dump, it will be ignored here.
+            TAG=".$param"
+            #echo "TAG: $TAG"
+          fi
+        fi
+        ;;
+      esac
+  	shift || break # past argument or value, and break when there are no more.
+  done
+
+  # Show some help if we still dont know which DB to work on
+  if [ -z "$DBNAME" ]; then
+    cerr "A mysqldump wrapper that saves some typing. The dump is saved in your current working directory."
+    cerr "Usage:  $(basename "$0") <database> [<tag>] [--gzip]"
+    cerr "- If <tag> is supplied, it will be incorporated in to the dump's filename. Dont use punctuation or spaces for <tag>. This is just a dumb script and weird things might happen."
+    cerr "- If --gzip is supplied, the dump file will be compressed."
+    cerr "- If you can't connect to mysql without a password, set up your ~/.my.cnf file to store your credentials. Make sure to chmod 600 your ~/.my.cnf file."
+    exit 1
+  fi
+
+  MYSQLSHOW="/usr/bin/mysqlshow --defaults-file=/root/.my.cnf"
+
+
+  # Check connectivity to MySQL
+  if type mysqlshow > /dev/null 2>&1; then
+    ($MYSQLSHOW "$DBNAME") > /dev/null || {
+      cerr "Could not access mysql db: $DBNAME"
+      exit 63
+    }
+  else
+    OUTPUT=$(mysql -e "use $DBNAME" 2>&1) || {
+      cerr "Could not connect to db: '$DBNAME'"
+      exit 68
+    }
+    if echo "$OUTPUT"| grep -q ERROR; then
+      cerr "Could not connect to db: $DBNAME"
+      exit 72
+    fi
+  fi
+
+  if [ -d "/var/backups/mysql" ]  && [ -w "/var/backups/mysql" ]; then
+    mkdir -pv "/var/backups/mysql/${DBNAME}"
+    # Try not to leave db dumps lying around.
+    # If we have permission, prefer to store the dump in the normal location, so the prune script can trim them away after the regular schedule.
+    DUMP_DIR="/var/backups/mysql/${DBNAME}"
+  else
+    # Dump to whatever directory we're running from
+    DUMP_DIR="$PWD"
+  fi
+  DATE_TIME="$( /bin/date +%Y-%m-%dT%H:%M:%S%z )"
+  SERVER_ID=$(uname -n)
+  DUMP_FILE_NAME="${DBNAME}.${DATE_TIME}.${SERVER_ID}${TAG}.sql"  # Tag got its period prepended above. It's absent here on purpose.
+  DUMPFILE="${DUMP_DIR}/${DUMP_FILE_NAME}"
+
+  if [ $COMPRESS -eq 1 ]; then
+    DUMPFILE="$DUMPFILE.gz"
+  fi
+
+  if type ionice > /dev/null 2>&1; then
+    NICECMD="nice -n 19 ionice -c2 -n7"
+  else
+    NICECMD="nice -n 19"
+  fi
+
+
+
+  MYSQLDUMP="/usr/bin/mysqldump --defaults-file=/root/.my.cnf"
+  # older versions of mysqldump don't understand the events flag
+  if $MYSQLDUMP --events --version > /dev/null 2>&1; then
+    EVENTSFLAG="--events"
+  else
+    EVENTSFLAG=""
+  fi
+
+
+  if [ $COMPRESS -eq 1 ]; then
+    if [ $PASS_THROUGH_COUNT -gt 0 ]; then
+      (set -x && $NICECMD $MYSQLDUMP --single-transaction --quick $EVENTSFLAG --ignore-table=mysql.events "${PASS_THROUGH_ARRAY[@]}" "$DBNAME"| $NICECMD gzip > "$DUMPFILE")
+    else
+      (set -x && $NICECMD $MYSQLDUMP --single-transaction --quick $EVENTSFLAG --ignore-table=mysql.events "$DBNAME"| $NICECMD gzip > "$DUMPFILE")
+    fi
+  else
+    if [ $PASS_THROUGH_COUNT -gt 0 ]; then
+      (set -x && $NICECMD $MYSQLDUMP --single-transaction --quick $EVENTSFLAG --ignore-table=mysql.events "${PASS_THROUGH_ARRAY[@]}" "$DBNAME">"$DUMPFILE")
+    else
+      (set -x && $NICECMD $MYSQLDUMP --single-transaction --quick $EVENTSFLAG --ignore-table=mysql.events "$DBNAME">"$DUMPFILE")
+    fi
+  fi
+
+  echo "$DUMPFILE" # This is our only output to STDOUT, so the filename can be consumed by whatever called it
+
+
+  STATUS=$?
+  if [ $STATUS -ne 0 ]; then
+    cerr "mysqldump did not exit cleanly. Removing dumpfile."
+    rm "$DUMPFILE"
+    exit $STATUS
+  fi
+
+}
+
+main "$@"

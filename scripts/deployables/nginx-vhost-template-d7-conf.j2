@@ -1,0 +1,107 @@
+server {
+  listen 80;
+
+  server_name {{ fqdn }};
+  root {{ docroot }};
+  index index.html index.php;
+  client_max_body_size 100m;
+  access_log {{ access_log }};
+  error_log {{ error_log }};
+
+  # Enable compression. This will help if you have, for instance, the advagg module
+  # by serving Gzip versions of the files.
+  gzip_static on;
+
+  # Requests for this just clutters log files.
+  location = /favicon.ico {
+    log_not_found off;
+    access_log off;
+  }
+
+  # Handle requests for robots.txt.
+  # This conf file is symlinked to an environment-specific file, so we can have different behaviour depending on whether this machine is production or staging / development.
+  include /etc/nginx/includes/robots.conf;
+
+  # Very rarely should these ever be accessed outside of your lan
+  location ~* \.(txt|log|sql|zip|gzip|gz|tar)$ {
+    deny all;
+  }
+
+  # Other Drupal files that contain PHP, but shouldn't be served or processed directly
+  location ~* \.(module|install|inc|theme|profile|engine|phar)$ {
+    return 403;
+  }
+
+  # Dont allow requests for PHP files in parent directories
+  location ~ \..*/.*\.php$ {
+    return 403;
+  }
+
+  # Don't allow php to run from inside upload dirs. PHP Execution + Anonymous write = Hacked website.
+  location ~ /sites/.*/files/.*\.php$ {
+    return 403;
+  }
+
+  # Don't serve anything from private diretories. BTW these should really be outside of your web root anyway.
+  location ~ ^/sites/.*/private/ {
+    return 403;
+  }
+
+  # Block access to "hidden" files and directories whose names begin with a
+  # period. This includes directories used by version control systems such
+  # as Subversion or Git to store control files.
+  location ~ (^|/)\. {
+    return 403;
+  }
+
+  # This is cool because no php is touched for static content
+  location / {
+    try_files $uri @rewrite;
+  }
+
+  # For D7 and above:
+  # Clean URLs are handled in drupal_environment_initialize().
+  location @rewrite {
+    rewrite ^ /index.php;
+  }
+
+  # Image cache doesn't work without this.
+  location ~ /sites/.*/files/styles/ {
+    try_files $uri @rewrite;
+  }
+
+  # Dont spam log files, and cache static content forever.
+  location ~* \.(js|css|png|jpg|jpeg|gif|ico)$ {
+    expires max;
+    log_not_found off;
+  }
+
+  # Drupal 8 update page doesn't work without this.
+  location ~ ^/update.php {
+    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+    #NOTE: You should have "cgi.fix_pathinfo = 0;" in php.ini
+    include fastcgi_params;
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+    fastcgi_intercept_errors on;
+    fastcgi_pass unix:{{ socket_file }};
+    fastcgi_read_timeout 600s;
+  }
+
+  # Drupal 7 using PHP FPM on a socket
+  location ~ \.php$ {
+
+    ## Properly deal with real 404 errors before we hand control off to php-fpm.
+    ## Otherwise, when someone requests /some-file-that-doesnt-exist.php, fastcgi just gives back a cryptic "No input file specified".
+    ## Only affects request URIs that end with a .php file extension
+    try_files  $uri =404;
+
+    fastcgi_split_path_info ^(.+\.php)(/.+)$;
+    #NOTE: You should have "cgi.fix_pathinfo = 0;" in php.ini
+    include fastcgi_params;
+    fastcgi_param SCRIPT_FILENAME $request_filename;
+    fastcgi_intercept_errors on;
+    fastcgi_pass unix:{{ socket_file }};
+    fastcgi_read_timeout 600s;
+  }
+
+}

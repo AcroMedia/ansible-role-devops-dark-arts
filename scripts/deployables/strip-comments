@@ -1,0 +1,28 @@
+#!/bin/bash
+
+
+function main () {
+  if [ $# -gt 0 ]; then
+    # Someone sent us one or more filenames
+    cat -- "$@" | sed -e '/^[ \t]*[#;]/d' -e  '/^[ \t]*\/\//d' -e '/^[ \t]*$/d'
+  else
+    if [ -t 0 ]; then
+      #  Someone called us without args or pipes.
+      usage
+    else
+      # Someone piped some stdin, or the contents of a file to us
+      DATA="$(cat)"
+      echo "$DATA" | sed -e '/^[ \t]*[#;]/d' -e  '/^[ \t]*\/\//d' -e '/^[ \t]*$/d'
+    fi
+  fi
+}
+
+
+function usage () {
+  echo "Usage:"
+  echo "$(basename "$0") /path/to/file1 [/path/to/file2 ...]"
+  echo "cat /path/to/file | $(basename "$0")"
+}
+
+
+main "$@"

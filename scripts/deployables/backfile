@@ -1,0 +1,145 @@
+#!/bin/bash -ue
+
+
+# --------------------------------------------------------------
+# Make a quick, secure, date-stamped backup of one or more files
+# Write abs path of backed up file(s) to stdout
+# --------------------------------------------------------------
+
+# Import some handy utility functions
+source /usr/local/lib/acro/bash/functions.sh
+
+
+function usage () {
+  cerr "Usage:"
+  cerr "  backfile file1 [file2] [fileN ...]"
+  cerr "For full documentation, see https://git.acromedia.com/acro/infrastructure/wikis/backfile"
+}
+
+
+function main () {
+
+  if [ $# -eq 0 ]; then
+    usage
+    return
+  fi
+
+  require_script "/usr/bin/install"
+
+  ATTEMPTED=0
+  BACKED_UP=0
+  local F
+  for F in "$@"; do
+    ATTEMPTED=$((ATTEMPTED + 1))
+    if back_up "$F"; then
+      BACKED_UP=$((BACKED_UP + 1))
+    fi
+  done
+  if [ $ATTEMPTED -eq $BACKED_UP ]; then
+    verbose "Backed up $BACKED_UP of $ATTEMPTED file(s)."
+  else
+    cerr "Backed up $BACKED_UP of $ATTEMPTED file(s)."
+    exit 1
+  fi
+}
+
+
+function verbose () {
+  if [ ${VERBOSE:-0} -eq 1 ]; then
+    cerr "$*"
+  fi
+}
+
+back_up () {
+
+  # Make sure dirs we create don't have any world permissions
+  umask 027
+
+  local F
+  F="$1"
+
+  if ! test -e "$F"; then
+    err "Can't back up '$F'. It either doesn't exist, or you don't have permission to read it."
+    return 1
+  fi
+
+  local F_FULL
+  if F_FULL="$(readlink -e "$F")"; then
+    : # Readlink resolved the file.
+  else
+    err "Trying to use 'readlink -e' returned an error. Cannot back up $F"
+    return 1
+  fi
+
+  if test -f "$F_FULL"; then
+    : # Yay, it's a regular file.
+  elif test -L "$F_FULL"; then
+    warn "Skipping '$F_FULL' because it's a symlink."
+    return 1
+  elif test -d "$F_FULL"; then
+    warn "Skipping '$F_FULL' because it's a directory (try backdir instead)."
+    return 1
+  else
+    warn "Skipping '$F_FULL' because it's not a regular file."
+    return 1
+  fi
+
+
+  # Decide where to put the backup, based on where it came from:
+  if echo "$F_FULL" |grep -qE '/home/.+/.+'; then
+    # If backing up a file inside /home/*/, the script is most likely being used by
+    # a regular user without sudo, and it makes more sense to keep the backup
+    # there, instead of trying to write to /var/backups, which is sure to fail.
+    local WHICH_USER
+    WHICH_USER="$(echo "$F_FULL" |awk -F '/' '{print $3}')"
+    DESTINATION_BASE_DIR="/home/${WHICH_USER}/backups"
+  elif echo "$F_FULL" |grep -qE '/root/.+'; then
+    # Files backed up from /root shouldn't leave that dir.
+    DESTINATION_BASE_DIR="/root/backups"
+    mkdir -pv /root/backups # There's no need to handle errors here. If the file was readable in root's directory, this won't fail. The -p flag keeps mkdir silent if the dir already exists.
+  else
+    DESTINATION_BASE_DIR="/var/backups"
+    if ! /usr/bin/install -v -m 2750 -g adm -o root -d "${DESTINATION_BASE_DIR}"; then
+      cerr "Do you have write permission on '$(dirname "${DESTINATION_BASE_DIR}")'?"
+      return 1
+    fi
+  fi
+
+
+  if [[ "$F" == "$F_FULL" ]]; then
+    : # Path given to us is the real path
+  else
+    verbose "Path '$F' resolves to '$F_FULL'"
+  fi
+
+  local F_PARENT_DIR
+  F_PARENT_DIR="$(dirname -- "${F_FULL}")"
+
+  local F_FILENAME_ONLY
+  F_FILENAME_ONLY="$(basename -- "${F_FULL}")"
+
+  local F_PARENT_DIR_WITHOUT_LEADING_SLASH
+  # shellcheck disable=SC2001
+  F_PARENT_DIR_WITHOUT_LEADING_SLASH="$(echo "${F_PARENT_DIR}"| sed -e 's/^\///')"
+
+  local BACKUP_DEST_DIR
+  BACKUP_DEST_DIR="${DESTINATION_BASE_DIR}/${F_PARENT_DIR_WITHOUT_LEADING_SLASH}"
+
+  if ! mkdir -pv "${BACKUP_DEST_DIR}"; then
+    cerr "Do you have write permission on '${DESTINATION_BASE_DIR}'?"
+    return 1
+  fi
+
+  local BACKUP_DEST_PATH
+  BACKUP_DEST_PATH="${BACKUP_DEST_DIR}/${F_FILENAME_ONLY}.$(date -u +%FT%TZ)~"
+
+  if cp -a -- "${F_FULL}" "${BACKUP_DEST_PATH}"; then
+    echo "$BACKUP_DEST_PATH"
+  else
+    cerr "Do you have write permission on '${BACKUP_DEST_DIR}'?"
+    return 1
+  fi
+
+}
+
+main "$@"

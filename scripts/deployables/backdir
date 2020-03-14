@@ -1,0 +1,147 @@
+#!/bin/bash
+
+##############################################
+# 2014-11-13, danderson.
+# Small script to quickly back up a folder
+##############################################
+
+
+# =============================================
+# Create a secure environment
+# ---------------------------------------------
+
+set -u     # Pseudo Strict mode: Fail if an undeclared variable is used
+umask 077  # Backups can contain sensitive info. Any files/folders we create should be private
+
+
+# =============================================
+# Prerequisites
+# ---------------------------------------------
+
+type readlink > /dev/null 2>&1 || {
+  echo "This script depends on the 'readlink' utility, which was not found in PATH."
+  exit 1
+}
+
+EXCLUSIONS="$0.exclusions"
+
+# Show some help
+if (( $# != 1 )); then
+  echo ""
+	echo "Usage: $(basename "$0") <dirname>"
+	echo "Tars up the single folder you specify, places it in a 'backups' dir with a datestamp, and removes group and world permissions."
+	echo "To exclude files from your archive, [create and] populate the TAR exclusions file in $EXCLUSIONS"
+	echo ""
+	exit 1
+fi
+
+# =============================================
+# User Defined Functions
+# ---------------------------------------------
+
+function logdebug () {
+  true
+  # Uncomment for debugging:
+  #  >&2 echo "$@"
+}
+
+function loginfo () {
+  true
+  # Uncomment for more info:
+  #  >&2 echo "$@"
+}
+
+
+function determine_archive_dir () {
+
+  DIRS_TO_TRY=("/var/backups" "$HOME/backups" "$HOME" "./backups" "./")
+
+  logdebug "Looking for an existing backup dir."
+
+  for i in "${!DIRS_TO_TRY[@]}"; do
+    DIR=$(readlink -e "${DIRS_TO_TRY[i]}") || { logdebug "dir does not exist: ${DIRS_TO_TRY[i]}" ; continue; }
+    logdebug "trying $DIR"
+    if [ -d "$DIR" ] && [ -w "$DIR" ]; then
+      logdebug "Found one."
+      echo "$DIR"
+      return
+    fi
+    logdebug "not a dir, or not writeable"
+  done
+
+  logdebug "No existing backup dirs exist, or none are writable. Will try to create one instead."
+
+  for i in "${!DIRS_TO_TRY[@]}"
+  do
+    DIR=$(readlink -f "${DIRS_TO_TRY[i]}") || continue
+    logdebug "trying $DIR"
+    [ ! -e "$DIR" ] \
+    && mkdir "$DIR" > /dev/null 2>&1 && {
+      loginfo "Created $DIR"
+      echo "$DIR"
+      return
+    }
+  done
+
+  >&2 echo "Could not find any suitable writeable directories. Aborting."
+  exit 1
+}
+
+
+
+# =============================================
+# Getting ready for processing
+# ---------------------------------------------
+
+DIR_TO_BACK_UP=$(readlink -e "${1}") || {
+  echo "Not found: $1"
+  exit 1
+}
+loginfo "Backing up ${DIR_TO_BACK_UP}..."
+ARCHIVEDIR="$(determine_archive_dir)"
+loginfo "ARCHIVEDIR: $ARCHIVEDIR"
+
+DATESTAMP="$(date +%Y-%m-%d.%H%M%S.%3N)" || DATESTAMP="$(date +%Y-%m-%d.%H%M%S)"
+TARFILE="$ARCHIVEDIR/$(basename "$DIR_TO_BACK_UP").${DATESTAMP}.tgz"
+loginfo "TARFILE: $TARFILE"
+
+
+
+# =============================================
+# Sanity checking
+# ---------------------------------------------
+
+if [ "$DIR_TO_BACK_UP" == "/" ]; then
+  echo "Sorry, you need to use a more robust tool to back up the root directory."
+  exit 1
+fi;
+
+if [ ! -d "$DIR_TO_BACK_UP" ]; then
+  echo "Not found (or not a directory): $DIR_TO_BACK_UP"
+  exit 1
+fi;
+
+if [ "$DIR_TO_BACK_UP" == "$(dirname "$TARFILE")" ]; then
+  echo "You can't back up the directory that the backup is being saved to."
+  exit 1
+fi;
+
+
+# =============================================
+# UND NOw VE DANCE
+# ---------------------------------------------
+
+# Use exclusions if they are specified
+echo -n "Backing up ${DIR_TO_BACK_UP}"
+# shellcheck disable=SC2001
+DIR_WITHOUT_LEADING_SLASH=$(echo "$DIR_TO_BACK_UP"| sed -e 's/^\///')
+if [ -f "$EXCLUSIONS" ]; then
+  echo " using exclusions specified from ${EXCLUSIONS}..."
+  tar --create --file "$TARFILE" --gzip --directory / "$DIR_WITHOUT_LEADING_SLASH" --exclude-from="$EXCLUSIONS"
+else
+  echo "..."
+  tar --create --file "$TARFILE" --gzip --directory / "$DIR_WITHOUT_LEADING_SLASH"
+fi
+
+HUMAN_BYTES="$(ls -laFh -- "${TARFILE}"|awk '{print $5}')B"
+echo "Saved $TARFILE (${HUMAN_BYTES})"

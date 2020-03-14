@@ -1,0 +1,21 @@
+# 2017-02-03, danderson:
+# This isn't actually programmitcally used, it's just for my own manual testing of revoke-ssh-key.sh
+
+# One
+from="127.0.0.1" ssh-rsa abcdef123456rAr/h9VVuEERPgP+L/IoU== this is the first instance and it has a custom directive
+
+# Two
+from="192.168.0.1" ssh-rsa abcdef123456rAr/h9VVuEERPgP+L/IoU== this is the second instance and it has a custom directive
+
+# Three
+ssh-rsa abcdef123456rAr/h9VVuEERPgP+L/IoU== this is the third instance and it is just normal
+
+# Four
+from="10.0.0.1" ssh-rsa abcdef123456rAr/h9VVuEERPgP+L/IoU== this is the fourth instance and it has a custom directive
+
+# Five
+# ssh-rsa abcdef123456rAr/h9VVuEERPgP+L/IoU== this is the fifth instance , normal, and commented out!
+
+# Six
+# from="192.168.100.100;SomethingElse=Foo" ssh-rsa abcdef123456rAr/h9VVuEERPgP+L/IoU== this is the fifth instance , with directive, and commented out!
+

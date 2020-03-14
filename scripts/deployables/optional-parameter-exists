@@ -1,0 +1,85 @@
+#!/bin/bash -ue
+
+# For use by other shell scripts, to easily detect the presence of optional parameters on the command line.
+#
+# First param (needle): The name of the pattern you want to parse from the command line.
+# Additioanl params (haystack): The command line parameters to search through.
+#
+# To use in your own script:
+# $ optional-parameter-exists '--foo' "$@"
+#                              ^^^^^----- This is the parameter name you want to detect the presence of. Stick to "long" form parameters. (i.e. --varname)
+#                              --------^^----- Pass the actual list of command line arguments that was sent to your script.
+#
+# To demonstrate:
+# $ optional-parameter-exists '--foo' --foo --bar "baz"
+# Exits silently with zero status.
+#
+# Another example:
+# $ optional-parameter-exists '--foo' -j 1 -k 2 --foo --lulu "lemon" --examp --le
+# Exits silently with zero status.
+#
+# Still another example:
+# $ optional-parameter-exists '--foo' -x 1 -y 2 --zed 'three'
+# Exits silently with error status, since '--foo' was nowhere in the haystack.
+#
+
+readonly NEEDLE_FOUND=0
+readonly NEEDLE_NOT_FOUND=1
+readonly MISSING_HAYSTACK=2
+
+function main() {
+
+  if [[ $# -lt 1 ]]; then
+    fatal "Nevermind the haystack, I didn't even get the needle. Whoever called me did it the wrong way."
+    exit $MISSING_HAYSTACK
+  fi
+
+  if [[ $# -lt 2 ]]; then
+    warn "I received no haystack to look through."
+  fi
+
+  PARAM_NAME_PATTERN=${1}; shift
+  debug "15 PARAM_NAME_PATTERN: $PARAM_NAME_PATTERN"
+  
+  while [[ $# -gt 0 ]]; do
+    key="$1"
+    debug "20, Key: $key"
+    case $key in
+      "${PARAM_NAME_PATTERN}")
+        debug "30 Found!"
+        exit $NEEDLE_FOUND;
+        ;;
+      *)
+        # unknown / ignored option
+        debug "35, continuing, $@"
+        ;;
+    esac
+    shift || break
+  done
+  debug "line 56, needle was not found."
+  exit $NEEDLE_NOT_FOUND
+}
+
+
+BOLD=$(tput bold 2>/dev/null) || BOLD='\033[1;33m'
+UNBOLD=$(tput sgr0 2>/dev/null) || UNBOLD='\033[m'
+
+function fatal () {
+  cerr "${BOLD}Fatal ($(basename "$0"))${UNBOLD}: $@"
+}
+
+function warn () {
+  cerr "${BOLD}Warn ($(basename "$0"))${UNBOLD}: $@"
+}
+
+function debug() {
+  : # Bash functions can't be empty, so keep the colon in front of this comment.
+  # Comment out the next line when not debugging.
+  # cerr "${BOLD}Debug ($(basename "$0"))${UNBOLD}: $@"
+}
+
+function cerr() {
+  >&2 echo "$@"
+}
+
+main "$@"

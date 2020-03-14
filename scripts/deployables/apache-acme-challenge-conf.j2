@@ -1,0 +1,6 @@
+# Temporary apache config to get the ACME cert authenticated.
+# Will be replaced by the real config once the cert has been installed.
+<VirtualHost *:80>
+  ServerName {{ fqdn }}
+  Include /etc/apache2/includes/letsencrypt-acme-challenge.conf
+</VirtualHost>

@@ -1,0 +1,35 @@
+#!/usr/bin/perl
+
+
+if (-f "/sbin/ifconfig") {
+  $ifconfig = '/sbin/ifconfig';
+}
+else {
+  $ifconfig = 'ifconfig';
+}
+
+@iparray = `$ifconfig`;
+
+print qq~
+Script will retrieve ipv4 addresses on this server and match them against the external ip address.
+The goal was avoid having to go to the portal over and over to find this info.
+NOTE: 127.0.0.x addresses will be skipped.
+
+~;
+printf ("%-16s %3s %-16s %8s\n","Ext-Public", '   ', "Int-Private", "Interface");
+
+foreach $ipline (@iparray) {
+  chomp($ipline);
+  next unless(grep(/^eth|inet addr:/,$ipline));
+  if (grep(/^eth/,$ipline)) {
+    ($ipdev)=(split(/\s+/,$ipline));
+    next;
+  }
+  ($ip)=(reverse split(/inet addr:/,$ipline));
+  ($ip)=(split(/\s+/,$ip));
+  next if (grep(/^127\.0\.0/,$ip));
+  $ext_ip = `/usr/bin/curl --connect-timeout 1 --interface $ip -s icanhazip.com;`;
+  chomp($ext_ip);
+  printf ("%-16s %3s %-16s %-8s\n","$ext_ip", '<->', "$ip", "$ipdev");
+}
+print "\n";

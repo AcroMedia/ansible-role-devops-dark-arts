@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# *ONLY* prints public IP addresses.
+# Does not print any of the other output or private IPs like lsipv4 does.
+# We used to just wrap lsipv4 and grep its output, but it turns out lsipv4 is broken on Ubuntu 18.04 :-(
+set -eu
+set -o pipefail
+
+# This will fail if any of the locally bound IP addresses actually have a legitimate 255 in the address.
+BOUND_IP4_ADDRESSES=$(/sbin/ifconfig |grep -E 'inet|eth'|grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}'|grep -v 255|grep -v ^127)
+
+for ADDR in $BOUND_IP4_ADDRESSES; do
+  /usr/bin/curl --connect-timeout 1 --interface $ADDR -sk https://www.0z.ca/ip || true
+done

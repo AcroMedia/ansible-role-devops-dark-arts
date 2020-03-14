@@ -1,0 +1,35 @@
+<VirtualHost *:80>
+  ServerName {{ fqdn }}
+  DocumentRoot {{ docroot }}
+  ErrorLog {{ error_log }}
+  CustomLog {{ access_log }} combined
+  Redirect / https://{{ fqdn }}
+</VirtualHost>
+
+<VirtualHost *:443>
+  ServerName {{ fqdn }}
+  DocumentRoot {{ docroot }}
+  ErrorLog {{ error_log }}
+  CustomLog {{ access_log }} combined
+  Include /etc/apache2/includes/letsencrypt-acme-challenge.conf
+  
+  SSLEngine on
+  SSLCertificateFile {{ ssl_cert }}
+  SSLCertificateKeyFile {{ ssl_key }}
+  SSLCertificateChainFile {{ ssl_ca_bundle }}
+  SSLOpenSSLConfCmd DHParameters /usr/local/ssl/private/dhparams.pem
+  
+  SSLProtocol +TLSv1 +TLSv1.1 +TLSv1.2
+  SSLCipherSuite HIGH:!aNULL:!MD5
+  
+  <Directory "{{ docroot }}">
+    Options -Indexes
+    Require all granted
+    DirectoryIndex index.php
+  </Directory>
+  
+  <FilesMatch "\.php$">
+    SetHandler application/x-httpd-php
+  </FilesMatch>
+  ProxyPassMatch ^/(.*\.php(/.*)?)$ unix://{{ socket_file }}|fcgi://localhost{{ docroot }}
+</VirtualHost>

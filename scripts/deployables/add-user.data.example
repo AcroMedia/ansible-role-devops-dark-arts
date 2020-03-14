@@ -1,0 +1,23 @@
+#!/bin/bash
+# This is a bash include. The shebang is just for the sake of sytnax highlighting in editors.
+
+KEYOWNERS+=('pparker')
+KEYTYPES+=("ssh-ed25519")
+KEYS+=('AAAAC3NzaC1lZDI1AAAAAAAAAAAAAAAAAAaabbbbbbbbbCCCCCCCCcDddddddddddddd')
+KEYCOMMENTS+=("work laptop")
+EMAILS+=("spiderman@gmail.com")
+SUDOERS+=(1)
+
+KEYOWNERS+=('bwayne')
+KEYTYPES+=("ssh-ed25519")
+KEYS+=('AAAAC3NzaC1lZDI1AAAAAAAAAAAAAAAAAAaabbbbbbbbbCCCCCCCCcDddddddddddddd')
+KEYCOMMENTS+=("office")
+EMAILS+=("batman@gmail.com")
+SUDOERS+=(0)
+
+KEYOWNERS+=('bwayne')
+KEYTYPES+=("ssh-rsa")
+KEYS+=('AAAAB3NzaC1yc2EAAAADAQABAAABAQDDXbtb89wwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwwweeeeeeeeeeeeeeeeeeeeeeeeeeeeeeefffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffsssssssssssssssssssssssssssssssssssssssssssssssaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaafffffffffffffffffffffffffffffffffffffffffffffffffffffffeee111')
+KEYCOMMENTS+=("laptop")
+EMAILS+=("batman@hotmail.com")
+SUDOERS+=(0)

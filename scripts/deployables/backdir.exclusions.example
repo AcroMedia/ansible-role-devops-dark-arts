@@ -1,0 +1,13 @@
+sites/default/files
+backups
+*.bak
+*.LCK
+*.o
+.git
+nbproject
+.settings
+.idea
+.cproject
+.project
+*.log
+wp-content/uploads

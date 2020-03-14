@@ -1,0 +1,123 @@
+#!/bin/bash -ue
+
+# For use by other shell scripts, to easily require named parameters.
+#
+# First param:      Needle - The name of the pattern you want to parse from the command line.
+# All other params: Haystack - The command line parameters.
+#
+# To use in your own script:
+#  require-named-parameter '--foo' "$@"
+#                           ^^^^^----- This is the parameter name you require from your user. Stick to "long" form parameters. (i.e. --varname)
+#                           --------^^----- Pass the actual list of command line arguments that was sent to your script.
+#
+# To demonstrate:
+# $ require-named-parameter '--foo' --foo bar
+# Prints "bar" to stdout.
+#
+# Another example:
+# $ require-named-parameter '--foo' -j 1 -k 2 --foo baz --lunkhead lemon --examp --le
+# Prints "baz" to stdout
+#
+# Still another example:
+# $ require-named-parameter '--foo' -x 1 -y 2 --zed 'three'
+# Exits with error, and prints "Missing value for '--foo'" to stderr.
+#
+
+readonly VALUE_FOUND=0
+readonly NEEDLE_NOT_FOUND=1
+readonly MISSING_HAYSTACK=2
+readonly VALUE_NOT_FOUND=3
+readonly TOO_MANY_VALUES=4
+
+# Call it like:
+# $ MAX_ALLOWED_VALUES=7 /path/to/require-named-paramenters --value "$@"
+# to allow more than 1 value to be returned.
+MAX_ALLOWED_VALUES=${MAX_ALLOWED_VALUES:-1}
+
+function main() {
+
+  if [[ $# -lt 1 ]]; then
+    fatal "Nevermind the haystack, I didn't even get the needle. Whoever called me did it the wrong way."
+    exit "$MISSING_HAYSTACK"
+  fi
+
+  if [[ $# -lt 2 ]]; then
+    warn "I received no haystack to look through."
+  fi
+
+  PARAM_NAME_PATTERN=${1}; shift
+  debug "15 PARAM_NAME_PATTERN: $PARAM_NAME_PATTERN"
+
+  KEY_IN_FOCUS=0
+  VALUES_FOUND=0
+
+  for ARG in "$@"; do
+      if [[ "$ARG" == "$PARAM_NAME_PATTERN" ]]; then
+        KEY_IN_FOCUS=1
+        debug "setting KEY_IN_FOCUS=1"
+        continue # past the key.
+      fi
+      debug "KEY_IN_FOCUS: $KEY_IN_FOCUS"
+      if [ $KEY_IN_FOCUS -eq 1 ]; then
+        if [[ "${ARG}" =~ ^-+ ]]; then
+          debug "Value starts with a dash. Not valid."
+          errmsg "You're either missing a value for '${PARAM_NAME_PATTERN}', or you specified a value that starts with a dash, which is not allowed."
+          exit "$NEEDLE_NOT_FOUND"
+        else
+          echo "$ARG"
+          debug "ARG: $ARG"
+          VALUES_FOUND=$((VALUES_FOUND+1))
+        fi
+      fi
+      KEY_IN_FOCUS=0
+      debug "VALUES_FOUND: $VALUES_FOUND"
+  done
+
+  # We ran out of arguments while key was in focus - value was not supplied for one or more keys.
+  if [ $KEY_IN_FOCUS -eq 1 ]; then
+    errmsg "Missing value for '${PARAM_NAME_PATTERN}'."
+    exit $VALUE_NOT_FOUND
+  fi
+
+  # No values were found.
+  if [ $VALUES_FOUND -eq 0 ]; then
+    errmsg "Missing value for '${PARAM_NAME_PATTERN}'."
+    exit $VALUE_NOT_FOUND
+  fi
+
+  # Too many args. (ie --name value1 --name value2  ) This is only OK if explicitly allowed.
+  if [ $VALUES_FOUND -gt $MAX_ALLOWED_VALUES ]; then
+    errmsg "Too many arguments matched '${PARAM_NAME_PATTERN}' ... If multiple matches can be accpeted, modify the consuming script to call 'MAX_ALLOWED_VALUES=$VALUES_FOUND $(basename "$0")'"
+    exit $VALUE_NOT_FOUND
+  fi
+
+  # If we got here, it's all good.
+  exit $VALUE_FOUND
+}
+
+
+BOLD=$(tput bold 2>/dev/null) || BOLD='\033[1;33m' # orange, if tput isnt available.
+UNBOLD=$(tput sgr0 2>/dev/null) || UNBOLD='\033[m'
+
+function errmsg () {
+  cerr "${BOLD}Err ($(basename "$0"))${UNBOLD}: $@"
+}
+function fatal () {
+  cerr "${BOLD}Fatal ($(basename "$0"))${UNBOLD}: $@"
+}
+
+function warn () {
+  cerr "${BOLD}Warn ($(basename "$0"))${UNBOLD}: $@"
+}
+
+function debug() {
+  : # Bash functions can't be empty, so keep the colon in front of this comment.
+  # Comment out the next line when not debugging.
+  # cerr "${BOLD}Debug ($(basename "$0"))${UNBOLD}: $@"
+}
+
+function cerr() {
+  >&2 echo "$@"
+}
+
+main "$@"
