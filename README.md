@@ -1,2 +1,2 @@
-# ansible-role-devops-dark-arts
-A collection of old shell scripts intended to make life easier for Acro Media sysadmins and developers
+# ansible-role-devops-utils
+A collection of shell scripts and hacks intended to make life easier for Acro Media sysadmins and developers
