@@ -582,13 +582,6 @@ function sanity_checks_pass () {
 
   if tty --quiet; then  # Is this an interactive session?
     cerr "${BOLD}Command line virtual host creation is now deprecated in favor of creation via ansible playbook.${UNBOLD}"
-    cerr "Please find this server's corresponding playbook in the Acro Infrastructure gitlab repository:"
-    cerr "  https://git.acromedia.com/acro/infrastructure/tree/master/ansible/playbooks-servers"
-    cerr "and add a new play to it."
-    cerr "If this host is part of a larger system, search gitlab for 'infrastructure' to find which set of playbooks it belongs to."
-    cerr "See https://wiki.acromediainc.com/wiki/Create_a_virtual_host_with_ansible for help."
-    cerr ""
-    cerr ""
 #    if [ $# -gt 0 ] && optional-parameter-exists "--non-compliant" "$@"; then
 #      true # Stay and play.
 #    else

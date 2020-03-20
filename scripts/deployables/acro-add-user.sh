@@ -549,7 +549,7 @@ function main() {
           # Also add the user's key to the specified secondary accounts.
           if [ -f "/home/${SECONDARY}/.ssh/authorized_keys" ]; then
             if [[ "$KEYOWNER" != "$SECONDARY" ]]; then
-              info "  Checking access to acro account..."
+              info "  Checking access to $SECONDARY account..."
               if grep -q "$PUBKEY" "/home/${SECONDARY}/.ssh/authorized_keys"; then
                 info "    User can already log in."
               else
@@ -878,23 +878,27 @@ function assert_owner_group () {
 }
 
 function usage () {
-  cerr "See https://wiki.acromedia.com/wiki/Acro-add-user.sh"
-  cerr "  This script creates user accounts for Acro Media employees and sets up each user's public "
-  cerr "  key for SSH access to the account(s). Users are not notifed of account creation "
-  cerr "  unless you pass the --notify option on the command line."
+  cerr "  This script creates user accounts for privileged users and sets up each user's public "
+  cerr "  key for SSH access to the account(s). Users can be notifed of account creation "
+  cerr "  if you pass the --notify option on the command line."
   cerr ""
-  cerr "  All acro employees usernames and public keys are already defined in the script, so "
+  cerr "  The script supports pre-defined lists of usernames and public keys via include, so "
   cerr "  all you normally need to do is provide the name of the user you want to create."
   cerr ""
-  cerr "  You may also create an arbitrary account that hasn't been defined in the file if"
-  cerr "  you additionally prefix the script with the GITHUB_USER=xxxx environment variable."
-  cerr "  The script will fetch GITHUB_USER's published SSH keys from to apply it to the account."
+  cerr "  You may also create an arbitrary account that hasn't been defined in the include."
+  cerr ""
+  cerr "  If you prefix the script with the GITHUB_USER=xxxx environment variable, and add "
+  cerr "  add --from-github switch, the script will fetch GITHUB_USER's published SSH keys"
+  cerr "  from to apply it to the account."
+  cerr ""
+  cerr "  If tell the script where your private gitlab server is, you can do the same "
+  cerr "  thing with the --from-gitlab switch."
   cerr "  "
   cerr "  If you specify a user whos account already exists, the users's home directory, "
-  cerr "  ssh keys, and permissions are updated to ensure usability."
+  cerr "  ssh keys, and permissions are updated to ensure security and usability."
   cerr ""
   cerr "  Usage: $(basename "$0") <username> [options]   # set up a single user"
-  cerr "     or: $(basename "$0") <username> --from-gitlab [options]   # set up a single user not defined in the built in map, usking keys from git.acromedia.com."
+  cerr "     or: GITLAB_SERVER_URL='https://private.server.com' $(basename "$0") --from-gitlab <username> [options]   # set up a single user not defined in the built in map, usking keys from GITLAB_SERVER_URL"
   cerr "     or: $(basename "$0") --update-all [options] # update keys and groups for existing users"
   cerr "     or: $(basename "$0") --create-all [options] # set up all users at once - only recommended for new servers"
   cerr "     or: GITHUB_USER=foobar $(basename "$0") --from-github <username-not-defined-in-file> [options] # Create a user that has not yet been defined"

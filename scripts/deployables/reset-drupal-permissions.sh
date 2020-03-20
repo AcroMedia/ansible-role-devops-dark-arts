@@ -5,9 +5,8 @@
 
 function main() {
   echo ''
-  echo 'Drupal 7: Run this script from your Drupal Root.'   
-  echo 'Drupal 8: Run this script from your Web Root.'   
-  echo 'See https://wiki.acromediainc.com/wiki/Reset-drupal-permissions.sh for documentation.'
+  echo 'Drupal 7: Run this script from your Drupal Root.'
+  echo 'Drupal 8: Run this script from your Web Root.'
   echo ''
   check_prerequisites
   seed_dummy_variables
@@ -63,7 +62,7 @@ function check_maintenance_mode_on() {
       return;
     fi
   fi
- 
+
   # drush version 9
   if [ "$DRUSH_VERSION" -eq 9 ]; then
     MM="$($DRUSH_PATH sget system.maintenance_mode)"
@@ -80,11 +79,11 @@ function check_maintenance_mode_on() {
     # drush version 8
     if [ "$DRUSH_VERSION" -eq 8 ]; then
       "$DRUSH_PATH" vset maintenance_mode 1
-    fi 
+    fi
 
     # drush version 9
     if [ "$DRUSH_VERSION" -eq 9 ]; then
-      "$DRUSH_PATH" sset system.maintenance_mode 1 --input-format=integer 
+      "$DRUSH_PATH" sset system.maintenance_mode 1 --input-format=integer
     fi
   fi
   echo ""
@@ -106,7 +105,7 @@ function check_maintenance_mode_off() {
       return;
     fi
   fi
- 
+
   # drush version 9
   if [ "$DRUSH_VERSION" -eq 9 ]; then
     MM="$($DRUSH_PATH sget system.maintenance_mode)"
@@ -125,15 +124,15 @@ function check_maintenance_mode_off() {
 
   echo "Do you want to bring the site out of maintenance mode?"
   if require_yes_or_no "MAINTENANCE_MODE_OFF"; then
- 
+
     # drush version 8
     if [ "$DRUSH_VERSION" -eq 8 ]; then
       "$DRUSH_PATH" vset maintenance_mode 0
-    fi 
+    fi
 
     # drush version 9
     if [ "$DRUSH_VERSION" -eq 9 ]; then
-      "$DRUSH_PATH" sset system.maintenance_mode 0 --input-format=integer 
+      "$DRUSH_PATH" sset system.maintenance_mode 0 --input-format=integer
     fi
 
   fi
@@ -609,7 +608,7 @@ function ctrl_c() {
 # Nothing happens until this line is read.
 # ----------------------------------------
 DRUSH_IS_WORKING=0 # Pessimistic. Will be set to 1 if and when drush is located and tested.
-DRUSH_VERSION="Unknown" # Will be set if drush is working. 
+DRUSH_VERSION="Unknown" # Will be set if drush is working.
 
 trap ctrl_c INT
 main "$@"
