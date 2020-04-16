@@ -26,7 +26,7 @@ function main() {
   # -----------------------------------------------
   # Set some defaults
   # -----------------------------------------------
-  GRANT_WEBS=0      # Add access to all of the web owner accounts if they exist.
+  GRANT_WEBS=${GRANT_WEBS:-0}   # Add access to all of the web owner accounts if they exist. Accept from env if defined.
   GRANT_SECONDARIES=1   # Default behaviour is to add access to secondary accounts if they are specified.
   NOTIFY=0          # Email notification is disabled by default. You need to specify --notify if you want the user to get an emaily telling them about their account creation.
   DUMP_KEYS=0
@@ -134,8 +134,14 @@ function main() {
           shift
           continue ;;
       --no-webs)
-          # Don't add keys to web owner accounts; only to the "real" specified user account.
+          # Override a default; Don't add keys to website accounts.
           GRANT_WEBS=0
+          shift
+          continue
+          ;;
+      --grant-webs)
+          # Add the real user's keys to website accounts in addition to their own.
+          GRANT_WEBS=1
           shift
           continue
           ;;
