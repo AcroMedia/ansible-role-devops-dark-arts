@@ -23,3 +23,11 @@
     chdir: "{{ remote_tempdir_result.path }}/"
   when: upload_result is defined
     and upload_result.changed
+
+- name: Upload config templates
+  template:
+    src: "{{ role_path }}/templates{{ item }}.j2"
+    dest: "{{ item }}"
+    backup: true
+  with_items:
+    - /etc/acro/add-user.conf

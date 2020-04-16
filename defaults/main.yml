@@ -1,2 +1,7 @@
 ---
 make_cmd: 'make -s install'
+
+# See templates/etc/acro/add-user.conf
+aau_gitlab_server_url: 'http://your.private-gitlab-server.tld'  # no trailing slash.
+aau_grant_webs: false
+aau_grant_secondaries: true

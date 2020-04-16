@@ -1,0 +1,20 @@
+#!/bin/bash
+# This is a bash include. White space is not trivial.
+# The shebang is only to trigger syntax highlighting in editors. Sourcing ignores it.
+
+GITLAB_SERVER_URL='{{ aau_gitlab_server_url }}'    # no trailling slash
+
+# GRANT_WEBS
+# Add the specified user to all "web" accounts found on the machine.
+# For use on machines that host sites created by acro-add-user.sh.
+# A web account is one that:
+#  - Is not configured in the list of defined users
+#  - Has PHP files inside the /home/<name>/www/ directory.
+#  - Whose home directory has mode 0751, which is what we usually set for web account folders.
+GRANT_WEBS={{ aau_grant_webs | ternary('1', '0') }}  # 1/0
+
+
+# GRANT_SECONDARIES
+# When a user has secondary groups specified, try adding the user's ssh key to
+# that secondary group's account. Assumes user and group name for secondary are identical.
+GRANT_SECONDARIES={{ aau_grant_secondaries | ternary('1', '0') }}   #  1/0
