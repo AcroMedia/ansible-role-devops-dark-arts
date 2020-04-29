@@ -45,14 +45,19 @@ function main() {
   # Override wired defaults with local environment defaults. Command line switches can still override these.
   # -----------------------------------------------
   local LOCAL_CONF=/etc/acro/add-user.conf
-  if assert_mode 644 "$LOCAL_CONF"; then
-    if assert_owner_group root root "$LOCAL_CONF"; then
-      debug "Reading config from $LOCAL_CONF"
-      # shellcheck disable=SC1091
-      # shellcheck disable=SC1090
-      source "$LOCAL_CONF"
+  if [ -e "$LOCAL_CONF" ]; then
+    if assert_mode 644 "$LOCAL_CONF"; then
+      if assert_owner_group root root "$LOCAL_CONF"; then
+        debug "Reading config from $LOCAL_CONF"
+        # shellcheck disable=SC1091
+        # shellcheck disable=SC1090
+        source "$LOCAL_CONF"
+      fi
     fi
+  else
+    warn "No local conf exists: $LOCAL_CONF"
   fi
+
 
   # -----------------------------------------------
   # Internal behaviour vars that are derived from command line switches
@@ -182,8 +187,7 @@ function main() {
           ;;
       -*)
           err "Unknown option: '$ARG'"
-          cerr "Pass --help to see usage options."
-          exit 1
+          return 1
           ;;
       *)
           # If the arg doesn't have any dashes, then we'll assume this is the user that we want to create or update.
@@ -224,7 +228,7 @@ function main() {
       read -r DRAMATIC_PAUSE
       if [[ $DRAMATIC_PAUSE != 'y' ]]; then
         cerr "Aborting."
-        exit 0
+        return 1
       fi
     fi
   fi
@@ -234,7 +238,7 @@ function main() {
       true # This is OK
     else
       err "Which user do you want to add?"
-      exit 1
+      return 1
     fi
   else
     info "User: $WHICHUSER"
@@ -246,10 +250,6 @@ function main() {
   fi
 
 
-  if [ -z "$GITLAB_SERVER_URL" ]; then
-    warn "GITLAB_SERVER_URL is not defined in ${LOCAL_CONF}. The --from-gitlab option is disabled."
-    FROM_GITLAB=0
-  fi
 
   # User data arrays
   KEYOWNERS=()
@@ -262,19 +262,27 @@ function main() {
 
 
   if [ $FROM_GITHUB -eq 1 ] || [ $FROM_GITLAB -eq 1 ]; then
+
+    if [ $FROM_GITLAB -eq 1 ]; then
+      if [ -z "${GITLAB_SERVER_URL:-}" ]; then
+        err "No GITLAB_SERVER_URL found in config or provided by environment."
+        return 1
+      fi
+    fi
+
     if ! type curl > /dev/null; then   # We need to be able to download keys
       err "No curl available. There's no way to download keys. Sorry."
-      exit 1
+      return 1
     fi
     if ! type ssh-keygen > /dev/null; then   # This is what we'll use to validate the well-formed-ness of the keys we download
       err "No ssh-keygen available. There's no way to verify the well-formed-ness of downloaded keys. Sorry."
-      exit 1
+      return 1
     fi
     EXTERNAL_KEYS_FILE=$(mktemp)
     if [ $FROM_GITHUB -eq 1 ] && [ -z "$GITHUB_USER" ]; then
       # @TODO ... get this from command line
-      err "When using the '--from-github' option, you must also provide GITHUB_USER as an environment variable, since the name of the github account may not be the username you want to create locally."
-      exit 1
+      err "No GITHUB_USER environment variable found."
+      return 1
     fi
     if [ $FROM_GITHUB -eq 1 ]; then
       EXTERNAL_KEYS_URL="https://github.com/${GITHUB_USER}.keys"
@@ -282,7 +290,7 @@ function main() {
       EXTERNAL_KEYS_URL="${GITLAB_SERVER_URL}/${WHICHUSER}.keys"    # We assume the gitlab user name is the same as the username you want to create here.
     else
       err "Missing value for EXTERNAL_KEYS_URL"
-      exit 1
+      return 1
     fi
     debug "EXTERNAL_KEYS_URL: $EXTERNAL_KEYS_URL"
     debug "EXTERNAL_KEYS_FILE: $EXTERNAL_KEYS_FILE"
@@ -291,7 +299,7 @@ function main() {
       err "Curl command failed: 'curl -sS $EXTERNAL_KEYS_URL'"
       cerr "Result:"
       >&2 cat "$EXTERNAL_KEYS_FILE"
-      exit 1
+      return 1
     fi
     debug "EXTERNAL_KEYS_FILE content: $(cat "$EXTERNAL_KEYS_FILE")"
 
@@ -324,19 +332,23 @@ function main() {
     done < "$EXTERNAL_KEYS_FILE"
     if [ $EXTERNAL_VALID_KEY_COUNT -eq 0 ]; then
       err "No valid keys were found for the external user you specified."
-      exit 1
+      return 1
     fi
   fi
 
   # Read in user + pubkey data
   local LOCAL_USER_KEYS_LIST=/etc/acro/add-user.data
-  if assert_mode 644 "$LOCAL_USER_KEYS_LIST"; then
-    if assert_owner_group root root "$LOCAL_USER_KEYS_LIST"; then
-      debug "Reading list of users and pubkeys from $LOCAL_USER_KEYS_LIST"
-      # shellcheck disable=SC1091
-      # shellcheck disable=SC1090
-      source "$LOCAL_USER_KEYS_LIST"
+  if [ -e "$LOCAL_USER_KEYS_LIST" ]; then
+    if assert_mode 644 "$LOCAL_USER_KEYS_LIST"; then
+      if assert_owner_group root root "$LOCAL_USER_KEYS_LIST"; then
+        debug "Reading list of users and pubkeys from $LOCAL_USER_KEYS_LIST"
+        # shellcheck disable=SC1091
+        # shellcheck disable=SC1090
+        source "$LOCAL_USER_KEYS_LIST"
+      fi
     fi
+  else
+    warn "No local user map exists at ${LOCAL_USER_KEYS_LIST}."
   fi
 
 
@@ -645,7 +657,8 @@ function main() {
   if [ $ACTEDON -gt 0 ] || [ $KEYS_DUMPED -gt 0 ]; then
     cerr "✔"
   else
-    cerr "❌ Check your arguments and try again. The user you specified isnt't configured in $0, or you specified an invalid option. To see help, run this script without any arguments."
+    cerr "❌ Check your arguments and try again. The user you specified is not configured, or you specified an invalid option."
+    help_hint
   fi
 
 }
@@ -653,7 +666,7 @@ function main() {
 
 function optional_parameter_exists () {
   if [[ $# -lt 1 ]]; then
-    error "Nevermind the haystack, I didn't even get the needle. Whoever called me did it the wrong way."
+    err "Nevermind the haystack, I didn't even get the needle. Whoever called me did it the wrong way."
     exit 1
   fi
   if [[ $# -lt 2 ]]; then
@@ -920,7 +933,12 @@ function usage () {
   cerr "                  Make sure to redirect output to /dev/null if you dont want everyone's pubkey on your screen."
 }
 
+function help_hint () {
+  cerr "Pass --help to see usage."
+}
+
 main "$@" || {
-  >&2 echo "❌"
+  >&2 echo -n "❌ "
+  help_hint
   exit 1
 }

@@ -2,7 +2,7 @@
 # This is a bash include. White space is not trivial.
 # The shebang is only to trigger syntax highlighting in editors. Sourcing ignores it.
 
-GITLAB_SERVER_URL='https://git.example.org'    # no trailling slash
+GITLAB_SERVER_URL='https://git.example.org'    # with protocol, no trailling slash.
 
 # GRANT_WEBS
 # Add the specified user to all "web" accounts found on the machine.
