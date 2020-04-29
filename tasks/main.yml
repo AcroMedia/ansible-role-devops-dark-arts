@@ -24,10 +24,17 @@
   when: upload_result is defined
     and upload_result.changed
 
-- name: Upload config templates
+- name: Upload aau config template
   template:
     src: "{{ role_path }}/templates{{ item }}.j2"
     dest: "{{ item }}"
     backup: true
   with_items:
     - /etc/acro/add-user.conf
+
+- name: Uplaod aau data file
+  copy:
+    src: "{{ aau_data_source }}"
+    dest: /etc/acro/add-user.data
+    backup: true
+  when: aau_data_source != ''

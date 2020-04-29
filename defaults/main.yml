@@ -5,3 +5,4 @@ make_cmd: 'make -s install'
 aau_gitlab_server_url: ''  # http://your.private-gitlab-server.com  # no trailing slash.
 aau_grant_webs: false
 aau_grant_secondaries: true
+aau_data_source: ''  # Specify a path from your local playbook. See scripts/deployables/add-user.data.example
