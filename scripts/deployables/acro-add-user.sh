@@ -776,7 +776,7 @@ function add_pubkey_key_to_all_web_accounts () {
   local NEW_AUTH_LINE="$3"
 
   find . -maxdepth 1 -name 'foo' -printf 0 > /dev/null || {
-    cerr "ERR: Find doesn't seem to support the '-printf' option. I cannot add the user to web account authorized_keys files."
+    err "Find doesn't seem to support the '-printf' option. I cannot add the user to web account authorized_keys files."
     return 1
   }
   info "  Giving ${OWNER} access to existing web accounts..."
@@ -797,37 +797,51 @@ function add_pubkey_key_to_all_web_accounts () {
   WEBACCOUNT_HOME_DIRS="$(echo "$WEB_ACCOUNT_LINES" |  cut -d":" -f6 |sort -u)"
   local HOMEDIR
   for HOMEDIR in $WEBACCOUNT_HOME_DIRS; do
-    local AUTHORIZED_KEYS="$HOMEDIR/.ssh/authorized_keys"
-    local WWWDIR="$HOMEDIR/www"
-    if test -f "$AUTHORIZED_KEYS" && test -d "$WWWDIR"; then
-      local PHP_FILE_COUNT
-      PHP_FILE_COUNT="$(find "$HOMEDIR/www"  -maxdepth 3 -type f -name '*.php' -printf '.'|wc -c)"
-      if is_positive_integer "$PHP_FILE_COUNT"; then
-        if [ "$PHP_FILE_COUNT" -gt 0 ]; then
-          info "    $AUTHORIZED_KEYS:"
-          local STATCODE
-          STATCODE="$(stat -c %a "$HOMEDIR")"
-          if [[ "$STATCODE" == *"700" ]]; then
-            info "     - skipping real user's dir"
-          elif [[ "$STATCODE" == *"755" ]] || [[ "$STATCODE" == *"751" ]]; then
-            if grep -q "$BARE_KEY" "$AUTHORIZED_KEYS"; then
-              info "     - exists"
-            else
-              info "     - adding"
-              {
-                echo ""
-                echo "# $OWNER"
-                echo "$NEW_AUTH_LINE"
-                echo ""
-              } >> "$AUTHORIZED_KEYS"
-              cerr "+ ${KEYTYPE}... ...${EMAIL} >> $AUTHORIZED_KEYS"
-            fi
-          else
-            warn "add_pubkey_key_to_all_web_accounts(), Ignoring home dir because of unhandled mode '$STATCODE': $HOMEDIR"
-          fi
-        fi
-      fi
+    if [ ! -d "$HOMEDIR" ]; then
+      info "Skipping $HOMEDIR because it isn't a directory."
+      continue
     fi
+    local STATCODE
+    STATCODE="$(stat -c %a "$HOMEDIR")"
+    if [[ "$STATCODE" == *"700" ]]; then
+      info "Skipping $HOMEDIR because of mode 700; probably a real person's home dir, and not a web account."
+      continue
+    fi
+    if [[ ! "$STATCODE" == *"755" ]] && [[ ! "$STATCODE" == *"751" ]]; then
+      warn "add_pubkey_key_to_all_web_accounts(), Ignoring dir '$HOMEDIR' because of unhandled mode '$STATCODE'"
+      continue
+    fi
+    local AUTHORIZED_KEYS="$HOMEDIR/.ssh/authorized_keys"
+    if  [ ! -f "$AUTHORIZED_KEYS" ]; then
+      info "Skipping $HOMEDIR because it has no authorized_keys file."
+      continue
+    fi
+    local WWWDIR="$HOMEDIR/www"
+    if [ ! -d "$WWWDIR" ]; then
+      info "Skipping $HOMEDIR because it has no www dir in it."
+      continue
+    fi
+    local WEB_FILE_COUNT
+    WEB_FILE_COUNT="$(find "$HOMEDIR/www"  -maxdepth 3 -type f \( -name '*.php' -o -name '*.htm' -o -name '*.html' \) -printf '.'|wc -c)"
+    if ! is_positive_integer "$WEB_FILE_COUNT"; then
+      info "Skipping $HOMEDIR because WEB_FILE_COUNT was not a positive integer: $WEB_FILE_COUNT"
+      continue
+    fi
+    if [ "$WEB_FILE_COUNT" -eq 0 ]; then
+      info "Skipping $HOMEDIR because WEB_FILE_COUNT was zero: $WEB_FILE_COUNT"
+      continue
+    fi
+    if grep -q "$BARE_KEY" "$AUTHORIZED_KEYS"; then
+      info "Not adding ${OWNER}'s pubkey to $AUTHORIZED_KEYS because it already exists."
+      continue
+    fi
+    {
+      echo ""
+      echo "# $OWNER"
+      echo "$NEW_AUTH_LINE"
+      echo ""
+    } >> "$AUTHORIZED_KEYS"
+    cerr "+ ${KEYTYPE}... ...${EMAIL} >> $AUTHORIZED_KEYS"
   done
 
 }
