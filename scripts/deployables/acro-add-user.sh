@@ -807,7 +807,9 @@ function add_pubkey_key_to_all_web_accounts () {
           info "    $AUTHORIZED_KEYS:"
           local STATCODE
           STATCODE="$(stat -c %a "$HOMEDIR")"
-          if [[ "$STATCODE" == *"751" ]]; then
+          if [[ "$STATCODE" == *"700" ]]; then
+            info "     - skipping real user's dir"
+          elif [[ "$STATCODE" == *"755" ]] || [[ "$STATCODE" == *"751" ]]; then
             if grep -q "$BARE_KEY" "$AUTHORIZED_KEYS"; then
               info "     - exists"
             else
@@ -821,7 +823,7 @@ function add_pubkey_key_to_all_web_accounts () {
               cerr "+ ${KEYTYPE}... ...${EMAIL} >> $AUTHORIZED_KEYS"
             fi
           else
-            info "     - skipping because dir does not have 751 mode; probably a real user's dir"
+            warn "add_pubkey_key_to_all_web_accounts(), Ignoring home dir because of unhandled mode '$STATCODE': $HOMEDIR"
           fi
         fi
       fi
