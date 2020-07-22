@@ -399,6 +399,11 @@ function main () {
     fi
   fi
 
+  cerr ""
+  warn "Be sure to manually check for (and remove) any orphaned PHP FPM or NGINX configs. This script can only perform a best-effort removal. Thoroughness is not guaranteed."
+  cerr "# grep -irl ${project} /etc/php*"
+  cerr "# grep -irl ${project} /etc/nginx*"
+
 }
 
 
