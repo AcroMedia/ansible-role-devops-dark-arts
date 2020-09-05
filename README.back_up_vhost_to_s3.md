@@ -13,9 +13,9 @@ Hostname is pulled from the internal `hostname -f` command on the server.
 
 ## Requirements
 - AWS cli installed
-- [acromedia devops utils](https://github.com/AcroMedia/ansible-role-devops-utils) installed
-- Read / write access to the specified S3 bucket from the Ec2 instance the script is running from
 - GNU Coreutils installed on the Ec2 instance the script is running from
+- The two other back_up_* scripts (mentioned above) available in $PATH
+- Read/write access to the specified S3 bucket from the Ec2 instance the script is running from (either via IAM role, or from ~/.aws/ config)
 - Passwordless mysql as root operations; it's assumed that mysql credentials will be stored securely at /root/.my.cnf
 
 
