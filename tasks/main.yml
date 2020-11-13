@@ -29,6 +29,9 @@
     src: "{{ role_path }}/templates{{ item }}.j2"
     dest: "{{ item }}"
     backup: true
+    owner: root
+    group: root
+    mode: '0644'
   with_items:
     - /etc/acro/add-user.conf
 
