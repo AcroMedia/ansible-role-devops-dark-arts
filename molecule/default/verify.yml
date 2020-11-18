@@ -1,0 +1,12 @@
+---
+- name: Check aau data file exists
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Check aau data file exists
+        stat:
+          path: /etc/acro/add-user.data
+        register: stat_result
+
+
