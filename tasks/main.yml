@@ -35,7 +35,7 @@
   with_items:
     - /etc/acro/add-user.conf
 
-- name: Uplaod aau data file
+- name: Upload aau data file
   copy:
     src: "{{ aau_data_source }}"
     dest: /etc/acro/add-user.data
