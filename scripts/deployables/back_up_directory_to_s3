@@ -1,0 +1,122 @@
+#!/bin/bash
+set -eu -o pipefail
+
+function main () {
+  if [ $EUID -ne 0 ]; then
+    warn 'This script should be run as root to avoid permissions problems.'
+  fi
+
+  if aws --version | grep -qw 'aws-cli'; then
+    true
+  else
+    err 'No AWS CLI utility found.'
+  fi
+
+  if gzip --version | grep -qw GNU ; then
+    true
+  else
+    warn 'No GNU gzip utility found.'
+  fi
+
+  if tar --version | grep -qw GNU ; then
+    true
+  else
+    warn 'No GNU tar utility found.'
+  fi
+
+  if readlink --version | grep -qw GNU; then
+    true
+  else
+    warn "No GNU 'readlink' found."
+  fi
+
+  if sed --version | grep -qw GNU; then
+    true
+  else
+    warn "No GNU 'sed' found."
+  fi
+
+  if tr --version | grep -qw GNU; then
+    true
+  else
+    warn "No GNU 'tr' found."
+  fi
+
+  local ABS_DIR=${1:-}
+  if [ -z "$ABS_DIR" ]; then
+    err "Missing required positional (unnamed) argument for ABS_DIR"
+  fi
+  if [ ! -e "${ABS_DIR}" ]; then
+    err "Directory not found: '${ABS_DIR}'"
+  fi
+
+  local S3_ARCHIVE_DEST=${2:-}
+  if [ -z "$ABS_DIR" ]; then
+    err "Missing required positional (unnamed) argument for S3_ARCHIVE_DEST"
+  fi
+
+  if [[ "$S3_ARCHIVE_DEST" =~ ^s3://.*/.*\.tgz$ ]]; then
+    true
+  else
+    err "S3_ARCHIVE_DEST must be a fully formed path, including the protocol and a .tgz filename extension. E.g: s3://bucket-name/file-name.tgz'"
+  fi
+
+  if [[ "$S3_ARCHIVE_DEST" =~ \.tgz$ ]]; then
+    true
+  else
+    err "S3_ARCHIVE_DEST must end with '.tgz'"
+  fi
+
+  if [ "$ERRORS" -gt 0 ]; then
+    cerr '✘'
+    exit "$ERRORS"
+  fi
+
+  S3_ARCHIVE_FILENAME=$(basename "$S3_ARCHIVE_DEST")
+  S3_ARCHIVE_CONTAINER=$(dirname "$S3_ARCHIVE_DEST")
+
+  BUCKET_LIST=$(aws s3 ls "$S3_ARCHIVE_CONTAINER") || {
+    cerr ''
+    cerr "The test to see if we can access ${S3_ARCHIVE_CONTAINER}, (before spending a lot of effort bundling up files) failed."
+    cerr "Check for misspellings, make sure you have bucket read/write permissions, and try again."
+    cerr '✘'
+    exit 1
+  }
+  FILTERED_LIST=$(echo "$BUCKET_LIST" | grep -ow "$S3_ARCHIVE_FILENAME") || true
+  if [[ "$FILTERED_LIST" == "$S3_ARCHIVE_FILENAME" ]]; then
+    err "S3 archive already exists: ${S3_ARCHIVE_FILENAME}"
+    cerr "Remove the old archive, or specify a different destination name."
+    cerr '✘'
+    exit 1
+  else
+    local REL_DIR
+    REL_DIR=$(echo -n "$ABS_DIR" | sed -e 's/^\///')
+    tar --directory=/ --create "$REL_DIR" | gzip -c | aws s3 cp - "$S3_ARCHIVE_DEST"
+    echo "$S3_ARCHIVE_DEST"  # Our only output to stdout is the file we created.
+  fi
+  cerr "✔"
+}
+
+ERRORS=0
+function err () {
+  cerr "ERR: $*"
+  ERRORS=$((ERRORS+1))
+}
+
+WARNINGS=0
+function warn () {
+  cerr "WARN: $*"
+  WARNINGS=$((WARNINGS+1))
+}
+
+NOTICES=0
+function notice () {
+  cerr "NOTICE: $*"
+  NOTICES=$((NOTICES+1))
+}
+
+function cerr () {
+  >&2 echo "$*"
+}
+
+main "$@"

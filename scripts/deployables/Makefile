@@ -30,6 +30,9 @@ ROOTONLY_SCRIPTS += list-nginx-server-names.php
 ROOTONLY_SCRIPTS += make-fake-swap-file.sh
 ROOTONLY_SCRIPTS += passwordless-sudo.sh
 ROOTONLY_SCRIPTS += set_fqdn.sh
+ROOTONLY_SCRIPTS += back_up_vhost_to_s3
+ROOTONLY_SCRIPTS += back_up_database_to_s3
+ROOTONLY_SCRIPTS += back_up_directory_to_s3
 
 RCNFFILE  = apache-vhost-template-d7-ssl-conf.j2
 RCNFFILE += apache-vhost-template-d7-conf.j2

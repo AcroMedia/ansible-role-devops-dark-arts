@@ -1,0 +1,101 @@
+#!/bin/bash
+set -eu -o pipefail
+
+function main () {
+  if type back_up_directory_to_s3 > /dev/null; then
+    true
+  else
+    err 'No back_up_directory_to_s3 utility found.'
+  fi
+
+  if type back_up_database_to_s3 > /dev/null; then
+    true
+  else
+    err 'No back_up_database_to_s3 utility found.'
+  fi
+
+  if date --iso-8601 >/dev/null; then
+    true
+  else
+    err "No usable 'date' util found."
+  fi
+
+  if [ -z "${BUCKET:-}" ]; then
+    cerr ''
+    err 'Missing required BUCKET environment variable.'
+    cerr "Required format: (1) the protocol, (2) the bucket name, (3) the trailing slash, and (4) and if desired, a name-prefix that files will prepended to all file names."
+    cerr "Examples:"
+    cerr "  export BUCKET=s3://my-archival-s3-bucket/"
+    cerr "  export BUCKET=s3://my-archival-s3-bucket/purposeful-prefix"
+    cerr ''
+  fi
+
+  if [ -z "${DIRECTORIES:-}" ]; then
+    warn "DIRECTORIES should be a quoted list of space-separated absolute directory names."
+    cerr "Example:"
+    cerr "  export DIRECTORIES='/home/bigcorp /etc /usr/local/ssl'"
+    cerr ''
+  fi
+
+  if [ -z "${DATABASES:-}" ]; then
+    warn "DATABASES should be a quoted list of space-separated database names."
+    cerr "Example:"
+    cerr "  export DATABASES='bigcorpstore bigcorpblog mysql'"
+    cerr ''
+  fi
+
+  if [ "$ERRORS" -gt 0 ]; then
+    cerr '✘'
+    exit "$ERRORS"
+  fi
+
+  SERVER_AND_DATE="$(hostname -f).$(date --iso-8601)"
+
+  DIRS_BACKED=0
+  # Back up director(y|ies)
+  for ABS_DIR in ${DIRECTORIES:-}; do
+    REL_DIR=$(echo -n "$ABS_DIR" | sed -e 's/^\///')
+    NO_SLASHES=$(echo -n "$REL_DIR" | tr --complement '[:alnum:]' '-')
+    S3_DEST="${BUCKET}${SERVER_AND_DATE}.dir.$NO_SLASHES.tgz"
+    back_up_directory_to_s3 "$ABS_DIR" "$S3_DEST"
+    DIRS_BACKED=$((DIRS_BACKED+1))
+  done
+
+  # Back up database(s)
+  DBS_BACKED=0
+  for DB_NAME in ${DATABASES:-}; do
+    S3_DEST="${BUCKET}${SERVER_AND_DATE}.db.$DB_NAME.sql.gz"
+    back_up_database_to_s3 "$DB_NAME" "$S3_DEST"
+    DBS_BACKED=$((DBS_BACKED+1))_
+  done
+
+  cerr "Directories backed up: $DIRS_BACKED"
+  cerr "Databases backed up: $DBS_BACKED"
+
+}
+
+
+ERRORS=0
+function err () {
+  cerr "ERR: $*"
+  ERRORS=$((ERRORS+1))
+}
+
+WARNINGS=0
+function warn () {
+  cerr "WARN: $*"
+  WARNINGS=$((WARNINGS+1))
+}
+
+NOTICES=0
+function notice () {
+  cerr "NOTICE: $*"
+  NOTICES=$((NOTICES+1))
+}
+
+function cerr () {
+  >&2 echo "$*"
+}
+
+
+main "$@"
