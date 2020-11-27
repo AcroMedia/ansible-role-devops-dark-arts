@@ -1,0 +1,35 @@
+- name: Make sure rysnc is installed locally
+  hosts: localhost
+  connection: local
+  become: no
+  gather_facts: yes
+  tasks:
+
+    - name: Update yum
+      yum:
+        update_cache: yes
+      when: ansible_os_family == 'RedHat'
+
+    - name: Ensure ssh client is installed
+      package:
+        name:
+          - openssh-clients
+        state: present
+      when: ansible_os_family == 'RedHat'
+
+    - name: Ensure rsync exists on the controller
+      package:
+        name:
+          - rsync
+        state: present
+
+    - name: Update apt cache.
+      apt: update_cache=true cache_valid_time=600
+      changed_when: false
+      when: ansible_os_family == 'Debian'
+
+    - name: make | install make
+      apt:
+        pkg: make
+        state: present
+      when: ansible_os_family == 'Debian'

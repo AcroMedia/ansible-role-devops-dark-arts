@@ -3,33 +3,5 @@
   hosts: all
   become: true
 
-  vars:
-    - make_cmd: 'make -s install'
-    - aau_gitlab_server_url: ''  # http://your.private-gitlab-server.com  # no trailing slash.
-    - aau_grant_webs: false
-    - aau_grant_secondaries: true
-    - aau_data_source: ''
-
-  pre_tasks:
-    - name: Update apt cache.
-      apt: update_cache=true cache_valid_time=600
-      changed_when: false
-
-    - name: rsync | install rsync
-      apt:
-        pkg: rsync
-        state: present
-
-    - name: install rsync on the ansible controller
-      connection: local
-      package:
-        name: rsync
-        state: present
-
-    - name: make | install make
-      apt:
-        pkg: make
-        state: present
-
   roles:
     - role: ansible-role-devops-utils
