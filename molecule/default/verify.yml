@@ -13,11 +13,11 @@
         that:
           - stat_result.stat.exists
 
-    - name: Test some trivial scripts (the ones we just installed)
+    - name: Trivially test some of the scripts we just installed
       shell: "{{ item }}"
       with_items:
-        - backdir /etc/
-        - backfile /etc/hosts
+        - /usr/local/bin/backdir /etc/
+        - /usr/local/bin/backfile /etc/hosts
         - mv /etc/acro/add-user.data.example /etc/acro/add-user.data
-        - acro-add-user.sh pparker
-        - acro-add-user.sh bwayne
+        - /usr/local/sbin/acro-add-user.sh pparker
+        - /usr/local/sbin/acro-add-user.sh bwayne
