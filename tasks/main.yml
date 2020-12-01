@@ -1,9 +1,14 @@
 ---
 # @TODO: replace the Makefile with real ansible tasks
 
-- name: Create a temporary dir on the host
-  tempfile:
+- name: Create an install dir on the host
+  file:
     state: directory
+    dest: /root/.acro/install/ansible-role-devops-utils
+    recurse: true
+    mode: '0700'
+    owner: root
+    group: root
   register: remote_tempdir_result
 
 - name: Sync local scripts to the remote temp dir
