@@ -1,12 +1,13 @@
 ---
-- name: Check aau data file exists
+- name: Check if scripts are deployed
   hosts: all
   become: yes
 
   tasks:
-    - name: Check aau data file exists
-        stat:
-          path: /etc/acro/add-user.data
-        register: stat_result
-
-
+    - name: Check aau add-user conf file exists
+      stat:
+        path: /etc/acro/add-user.conf
+      register: stat_result
+    - assert:
+        that:
+          - stat_result.stat.exists
