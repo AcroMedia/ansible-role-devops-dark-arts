@@ -1,16 +1,18 @@
-- name: Make sure rysnc is installed locally
+- name: Make sure rsync is installed (locally) on the ansible controller.
+    This is only necessary for testing roles that use rsync, because the fedora
+    image from robertdebock does not come with rsync installed.
   hosts: localhost
   connection: local
   become: no
   gather_facts: yes
   tasks:
 
-    - name: Update yum
+    - name: Update yum cache on the controller
       yum:
         update_cache: yes
       when: ansible_os_family == 'RedHat'
 
-    - name: Ensure ssh client is installed
+    - name: Ensure ssh client is installed on the controller
       package:
         name:
           - openssh-clients
@@ -23,13 +25,26 @@
           - rsync
         state: present
 
+- name: Prepare II - Prepare the test image for Converge
+  hosts: all
+  become: yes
+  gather_facts: yes
+  tasks:
+
     - name: Update apt cache.
-      apt: update_cache=true cache_valid_time=600
-      changed_when: false
+      apt:
+        update_cache: yes
       when: ansible_os_family == 'Debian'
 
-    - name: make | install make
-      apt:
-        pkg: make
+    - name: Update yum cache
+      yum:
+        update_cache: yes
+      when: ansible_os_family == 'RedHat'
+
+    - name: Ensure dependencies are present test image
+      package:
+        name: "{{ item }}"
         state: present
-      when: ansible_os_family == 'Debian'
+      with_items:
+        - rsync
+        - make
