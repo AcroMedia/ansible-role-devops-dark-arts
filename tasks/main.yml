@@ -5,7 +5,6 @@
   tempfile:
     state: directory
   register: remote_tempdir_result
-  changed_when: false   #  This task can't pass idempotence, so we have to fake it until these scripts are converted to template tasks, or until the role is retired, whichever comes first.
 
 - name: Sync local scripts to the remote temp dir
   synchronize:
@@ -17,7 +16,6 @@
   when: remote_tempdir_result is defined
     and remote_tempdir_result.path is defined
   register: upload_result
-  changed_when: false   #  This task can't pass idempotence, so we have to fake it until these scripts are converted to template tasks, or until the role is retired, whichever comes first.
 
 - name: Run '{{ make_cmd }}' in the remote temp dir
   shell: "{{ make_cmd }}"
@@ -25,7 +23,6 @@
     chdir: "{{ remote_tempdir_result.path }}/"
   when: upload_result is defined
     and upload_result.changed
-  changed_when: false   #  This task can't pass idempotence, so we have to fake it until these scripts are converted to template tasks, or until the role is retired, whichever comes first.
 
 - name: Upload aau config template
   template:
