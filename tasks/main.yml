@@ -4,8 +4,7 @@
 - name: Create an install dir on the host
   file:
     state: directory
-    dest: /root/.acro/install/ansible-role-devops-utils
-    recurse: true
+    dest: /root/.acromedia-install-ansible-role-devops-utils
     mode: '0700'
     owner: root
     group: root
@@ -16,6 +15,9 @@
     src: "scripts/deployables/"
     dest: "{{ remote_tempdir_result.path }}/"
     recursive: true
+    perms: no
+    group: no
+    owner: no
     rsync_opts:
       - "--exclude=.git"
   when: remote_tempdir_result is defined
