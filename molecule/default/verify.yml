@@ -1,0 +1,23 @@
+---
+- name: Check if scripts are deployed
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: Gather info about aau add-user conf
+      stat:
+        path: /etc/acro/add-user.conf
+      register: stat_result
+    - name: Ensure conf file is present
+      assert:
+        that:
+          - stat_result.stat.exists
+
+    - name: Trivially test some of the scripts we just installed
+      shell: "{{ item }}"
+      with_items:
+        - /usr/local/bin/backdir /etc/
+        - /usr/local/bin/backfile /etc/hosts
+        - mv /etc/acro/add-user.data.example /etc/acro/add-user.data
+        - /usr/local/sbin/acro-add-user.sh pparker
+        - /usr/local/sbin/acro-add-user.sh bwayne

@@ -1,9 +1,13 @@
 ---
 # @TODO: replace the Makefile with real ansible tasks
 
-- name: Create a temporary dir on the host
-  tempfile:
+- name: Create an install dir on the host
+  file:
     state: directory
+    dest: /root/.acromedia-install-ansible-role-devops-utils
+    mode: '0700'
+    owner: root
+    group: root
   register: remote_tempdir_result
 
 - name: Sync local scripts to the remote temp dir
@@ -11,6 +15,9 @@
     src: "scripts/deployables/"
     dest: "{{ remote_tempdir_result.path }}/"
     recursive: true
+    perms: no
+    group: no
+    owner: no
     rsync_opts:
       - "--exclude=.git"
   when: remote_tempdir_result is defined
