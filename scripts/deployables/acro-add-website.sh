@@ -39,47 +39,48 @@ USE_SSL=0
 VHOST_CONF_STUB=""
 
 IS_RDS=0
-if [ $# -gt 0 ] && optional-parameter-exists "--rds" "$@"; then
+
+if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--rds" "$@"; then
   IS_RDS=1
 fi
 
 FORCE=0
-if [ $# -gt 0 ] && optional-parameter-exists "--force" "$@"; then
+if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--force" "$@"; then
   FORCE=1
   >&2 echo "FORCE=1 has been specified. Errors will be ignored. Good luck, soldier."
 fi
 
 WEBSERVER="nginx"
-if [ $# -gt 0 ] && optional-parameter-exists "--apache" "$@"; then
+if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--apache" "$@"; then
   # Apache on Ubuntu
   WEBSERVER="apache"
-elif [ $# -gt 0 ] && optional-parameter-exists "--httpd" "$@"; then
+elif [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--httpd" "$@"; then
   # Apache on Red Hat
   WEBSERVER="httpd"
 fi
 
 # Allow creation of a site without MySQL ... this is meant to be used along with "--php-version none"
 USE_MYSQL=1
-if [ $# -gt 0 ] && (optional-parameter-exists "--skip-mysql" "$@" || optional-parameter-exists "--no-mysql" "$@"); then
+if [ $# -gt 0 ] && (/usr/local/bin/optional-parameter-exists "--skip-mysql" "$@" || /usr/local/bin/optional-parameter-exists "--no-mysql" "$@"); then
   USE_MYSQL=0
 else
-  if [ $# -gt 0 ] && optional-parameter-exists "--mysql-allow-from" "$@"; then
-    MYSQL_ALLOW_FROM="$(require-named-parameter "--mysql-allow-from" "$@")"
+  if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--mysql-allow-from" "$@"; then
+    MYSQL_ALLOW_FROM="$(/usr/local/bin/require-named-parameter "--mysql-allow-from" "$@")"
   else
     MYSQL_ALLOW_FROM='localhost'
   fi
 
   # @TODO See if we can detect this from the mysql connection that we're on, intead of having to provide it manually.
   #       Parse it out of /root/.my.cnf maybe? Can we find this out from the mysql cli client?
-  if [ $# -gt 0 ] && optional-parameter-exists "--mysql-host-address" "$@"; then
-    MYSQL_HOST_ADDRESS="$(require-named-parameter "--mysql-host-address" "$@")"
+  if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--mysql-host-address" "$@"; then
+    MYSQL_HOST_ADDRESS="$(/usr/local/bin/require-named-parameter "--mysql-host-address" "$@")"
   else
     MYSQL_HOST_ADDRESS='localhost'
   fi
 fi
 
 
-if [ $# -gt 0 ] && (optional-parameter-exists "--skip-ssl" "$@" ||  optional-parameter-exists "--no-ssl" "$@"); then
+if [ $# -gt 0 ] && (/usr/local/bin/optional-parameter-exists "--skip-ssl" "$@" ||  /usr/local/bin/optional-parameter-exists "--no-ssl" "$@"); then
   : # SSL has been disabled by request
 elif test -e "$LE_WWW/.well-known/acme-challenge" && test -x "$CERTBOT"; then
   # Use certbot if it's available
@@ -103,8 +104,8 @@ export VHOST_CONF_STUB
 # Get configuration from an external file
 #----------------------------------------------------------------------------
 
-if [ $# -gt 0 ] && optional-parameter-exists "--php-version" "$@"; then
-  PHP_VERSION="$(require-named-parameter "--php-version" "$@")"
+if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--php-version" "$@"; then
+  PHP_VERSION="$(/usr/local/bin/require-named-parameter "--php-version" "$@")"
   readonly ACROCONF="${ACROCONFROOT}/add-website.conf.php${PHP_VERSION}"
 else
   readonly ACROCONF="${ACROCONFROOT}/add-website.conf"
@@ -143,13 +144,13 @@ function main () {
 
   sanity_checks_pass "$@" || exit 110
 
-  if optional-parameter-exists '--help' "$@" 2 > /dev/null; then
+  if /usr/local/bin/optional-parameter-exists '--help' "$@" 2 > /dev/null; then
     usage
     exit 0
   fi
 
-  if optional-parameter-exists '--account' "$@" 2 > /dev/null; then
-    USERACCOUNT="$(require-named-parameter "--account" "$@")"
+  if /usr/local/bin/optional-parameter-exists '--account' "$@" 2 > /dev/null; then
+    USERACCOUNT="$(/usr/local/bin/require-named-parameter "--account" "$@")"
   else
     echo "Please enter the account name"
     USERACCOUNT="$(prompt_for_value_with_default "USERACCOUNT" "")"
@@ -157,8 +158,8 @@ function main () {
   fi
 
   DEFAULT_PROJECT="${USERACCOUNT}";
-  if optional-parameter-exists '--project' "$@" 2 > /dev/null; then
-    PROJECT="$(require-named-parameter "--project" "$@")"
+  if /usr/local/bin/optional-parameter-exists '--project' "$@" 2 > /dev/null; then
+    PROJECT="$(/usr/local/bin/require-named-parameter "--project" "$@")"
     [ "${PROJECT}" = "DEFAULT" ] && PROJECT="${DEFAULT_PROJECT}"
   else
     echo "Please enter the project name (hit enter to leave as project name)"
@@ -167,8 +168,8 @@ function main () {
   fi
 
   DEFAULT_FQDN="${PROJECT}.$(hostname -f)"
-  if optional-parameter-exists '--fqdn' "$@" 2 > /dev/null; then
-    FQDN="$(require-named-parameter "--fqdn" "$@")"
+  if /usr/local/bin/optional-parameter-exists '--fqdn' "$@" 2 > /dev/null; then
+    FQDN="$(/usr/local/bin/require-named-parameter "--fqdn" "$@")"
     [ "${FQDN}" = "DEFAULT" ] && FQDN="${DEFAULT_FQDN}"
   else
     echo "Please enter the FQDN (hit enter to leave as default)"
@@ -177,8 +178,8 @@ function main () {
   fi
 
   DEFAULT_WEBROOT="wwwroot"
-  if optional-parameter-exists '--webroot' "$@" 2 > /dev/null; then
-    WEB_ROOT_DIRNAME="$(require-named-parameter "--webroot" "$@")"
+  if /usr/local/bin/optional-parameter-exists '--webroot' "$@" 2 > /dev/null; then
+    WEB_ROOT_DIRNAME="$(/usr/local/bin/require-named-parameter "--webroot" "$@")"
     # If --webroot is "NONE" then change it to empty string to show that we don't want to make a dir.
     [ "${WEB_ROOT_DIRNAME}" = "NONE" ] && WEB_ROOT_DIRNAME=""
   else
@@ -229,8 +230,8 @@ function main () {
         exit 7
       fi
     fi
-    if [ $# -gt 0 ] && optional-parameter-exists "--service-account" "$@"; then
-      SERVICEACCOUNT=$(require-named-parameter '--service-account' "$@")
+    if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--service-account" "$@"; then
+      SERVICEACCOUNT=$(/usr/local/bin/require-named-parameter '--service-account' "$@")
     else
       SERVICEACCOUNT="$(echo "$USERACCOUNT"| cut -c1-12)-srv"
     fi
@@ -244,8 +245,8 @@ function main () {
     fi
     export DBUSER
   else
-    if [ $# -gt 0 ] && optional-parameter-exists "--service-account" "$@"; then
-      SERVICEACCOUNT=$(require-named-parameter '--service-account' "$@")
+    if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--service-account" "$@"; then
+      SERVICEACCOUNT=$(/usr/local/bin/require-named-parameter '--service-account' "$@")
     else
       SERVICEACCOUNT="$(make_compound_service_account_name "$USERACCOUNT" "$PROJECT")"
     fi
@@ -280,8 +281,8 @@ function main () {
 
   DEFAULT_RESPONSIBLE_PERSON="root"
   if tty --quiet; then  # Is this an interactive session?
-    if optional-parameter-exists '--responsible-person' "$@" 2 > /dev/null; then
-      RESPONSIBLE_PERSON="$(require-named-parameter "--responsible-person" "$@")"
+    if /usr/local/bin/optional-parameter-exists '--responsible-person' "$@" 2 > /dev/null; then
+      RESPONSIBLE_PERSON="$(/usr/local/bin/require-named-parameter "--responsible-person" "$@")"
     else
       echo "Who should receive notifications generated by the '${USERACCOUNT}' and '${SERVICEACCOUNT}' system accounts?"
       echo "- Enter your own email address, or leave as default to let notifications go to ${DEFAULT_RESPONSIBLE_PERSON}:"
@@ -582,7 +583,7 @@ function sanity_checks_pass () {
 
   if tty --quiet; then  # Is this an interactive session?
     cerr "${BOLD}Command line virtual host creation is now deprecated in favor of creation via ansible playbook.${UNBOLD}"
-#    if [ $# -gt 0 ] && optional-parameter-exists "--non-compliant" "$@"; then
+#    if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--non-compliant" "$@"; then
 #      true # Stay and play.
 #    else
 #      exit 1
