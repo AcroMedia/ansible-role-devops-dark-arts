@@ -20,7 +20,12 @@ function main () {
   type timeout > /dev/null
   type nc > /dev/null
   verbose "OK"
-  INTERFACE=$(netstat -i |grep -E '^eth|^en' -m 1|awk '{print $1}')
+  INTERFACES=$(netstat -i)
+  FILTERED=$(echo "$INTERFACES"| grep -vE '^docker|^lo|^Iface')
+  SORTED=$(echo "$FILTERED" | sort -k 3 -n -r)
+  BUSIEST=$(echo "$SORTED"|head -1)
+  INTERFACE=$(echo "$BUSIEST" |awk '{print $1}')
+  # ^ List interfaces, exlude docker loopback, adn the title line, sort by traffic descending, take the first line.
   verbose "INTERFACE: $INTERFACE"
   MY_IP=$(ifconfig "$INTERFACE"|grep -w inet|grep -o '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' -m 1|head -1)
   verbose "MY_IP: $MY_IP"
