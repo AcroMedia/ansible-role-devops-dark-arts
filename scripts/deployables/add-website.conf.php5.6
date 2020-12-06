@@ -7,8 +7,21 @@ PHP_FPM_SERVICE_NAME="php5.6-fpm"
 readonly PHP_FPM_LOGROTATE_POSTROTATE="/usr/lib/php/php5.6-fpm-reopenlogs"
 readonly VHOSTLOGROOT="/var/log/vhosts"
 readonly HOMEROOT="/home"
-readonly NGINX_SITES_AVAILABLE="/etc/nginx/sites-available"
-readonly NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
+if [ -d "/etc/nginx/sites-available" ] \
+  && [ -d "/etc/nginx/sites-enabled" ]; then
+    # Probalby Debian/Ubuntu
+  NGINX_SITES_AVAILABLE="/etc/nginx/sites-available"
+  NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
+elif [ -d "/etc/nginx/conf.d" ] \
+  && [ ! -d "/etc/nginx/sites-available" ] \
+  && [ ! -d "/etc/nginx/sites-enabled" ]; then
+    # Probalby RedHat / CentOS
+  NGINX_SITES_AVAILABLE="/etc/nginx/conf.d"
+  NGINX_SITES_ENABLED="/tmp" # Throwaway. Adding a site to conf.d doensn't require a symlink to enable it.
+else
+  >&2 echo "I don't know where to create nginx configs. Manual intervention is required in /etc/acro/add-website.conf.phpnone."
+  exit 1
+fi
 readonly APACHE_SITES_AVAILABLE="/etc/apache2/sites-available"
 readonly APACHE_SITES_ENABLED="/etc/apache2/sites-enabled"
 readonly NGINX_CONF_TEMPLATE="$ACROCONFROOT/nginx-vhost-template-d7${VHOST_CONF_STUB}-conf.j2"
