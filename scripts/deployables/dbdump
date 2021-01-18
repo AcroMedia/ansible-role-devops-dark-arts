@@ -16,7 +16,7 @@ function cerr () {
 function main () {
   # Create defaults
   DBNAME=${DBNAME:-} # Accept DBNAME as an environment variable
-  COMPRESS=${COMPRESS:-0} # Accept COMPRESS as an environment variable
+  COMPRESS=${COMPRESS:-1} # Compress by default, or accept COMPRESS as an environment variable.
   TAG=""
 
   PASS_THROUGH_ARRAY=()  # Anything that we dont use ourselves, pass through to mysqldump (such as --skip-extended-insert, etc)
@@ -24,14 +24,18 @@ function main () {
 
   # Gobble the arguments and check for options.
   while [ $# -gt 0 ]; do
-  	param="$1"
+    param="$1"
     #echo "param: $param"
     case $param in
       "-z"|"--gzip"|"--compress")
-        COMPRESS=1
+        COMPRESS=1   #  Gzipping is the default behaviour, but we still need to provide a CLI option to override the case the environment variable was set to 0
         #echo "Compressing: Yes"
         ;;
-  		*)
+      "-no-z"|"--no-gzip"|"--no-compress")
+        COMPRESS=0
+        #echo "Compressing: No"
+        ;;
+      *)
         if [[ "$param" =~ ^-+ ]]; then
           : # any undefined parameters that start with a dash will be passed through to mysqldump.
           PASS_THROUGH_ARRAY+=("$param")
@@ -50,16 +54,18 @@ function main () {
         fi
         ;;
       esac
-  	shift || break # past argument or value, and break when there are no more.
+    shift || break # past argument or value, and break when there are no more.
   done
 
   # Show some help if we still dont know which DB to work on
   if [ -z "$DBNAME" ]; then
-    cerr "A mysqldump wrapper that saves some typing. The dump is saved in your current working directory."
-    cerr "Usage:  $(basename "$0") <database> [<tag>] [--gzip]"
-    cerr "- If <tag> is supplied, it will be incorporated in to the dump's filename. Dont use punctuation or spaces for <tag>. This is just a dumb script and weird things might happen."
-    cerr "- If --gzip is supplied, the dump file will be compressed."
-    cerr "- If you can't connect to mysql without a password, set up your ~/.my.cnf file to store your credentials. Make sure to chmod 600 your ~/.my.cnf file."
+    cerr "A mysqldump wrapper that saves some typing. The dump is saved inside /var/backups/mysql if you have access there, otherwise to the current working directory."
+    cerr "Usage:  $(basename "$0") <database> [<tag>] [--no-gzip] [-mysql-opt-1] [-mysql-opt-N]"
+    cerr "- <database>:      The first non-dash argument will be accepted as the DB name to dump."
+    cerr "- [<tag>]:         Any other non-dash argument will be accepted as a 'tag' or descriptive slug, and incorporated into to the dump's fililename. Don't use punctuation or spaces for <tag>, since all except the last token will be discarded."
+    cerr "- [--no-gzip]:     Dumps are compressed by default before they are written to disk. Specify --no-gzip if you want it left uncompressed."
+    cerr "- [-mysql-opt-N]:  Any additional dash options you provide will be passed through to mysqldump."
+    cerr "- To connect to mysql without a password, set up a ~/.my.cnf file to store your credentials. Be sure to chmod 0600 the credentials file."
     exit 1
   fi
 
@@ -83,7 +89,7 @@ function main () {
     fi
   fi
 
-  if [ -d "/var/backups/mysql" ]  && [ -w "/var/backups/mysql" ]; then
+  if [ -d "/var/backups/mysql" ]  && [ -w "/var/backups/mysql" ]; then   # Does it exist, and can we write to it?
     mkdir -pv "/var/backups/mysql/${DBNAME}"
     # Try not to leave db dumps lying around.
     # If we have permission, prefer to store the dump in the normal location, so the prune script can trim them away after the regular schedule.
