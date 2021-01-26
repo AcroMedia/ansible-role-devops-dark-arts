@@ -736,6 +736,10 @@ function sanity_checks_pass() {
     cerr "The 'useradd' command was not found. Hint: Use 'sudo -i <script>' or 'sudo su -' to gain root's PATH."
     return 1
   }
+  if ! type chsh > /dev/null; then
+    err "The command chsh was not found in PATH. On Ubuntu and RedHat, chsh is usually present by default. On Amazon Linux, you need to install the 'util-linux-user' package first."
+    return 1
+  fi
 }
 
 
