@@ -41,6 +41,16 @@
         update_cache: yes
       when: ansible_os_family == 'RedHat'
 
+      - name: Ensure OS-specific dependencies are present in test image
+      package:
+        name: "{{ package_dependencies }}"
+        state: present
+      vars:
+        package_dependencies:
+          - util-linux-user
+      when: ansible_distribution == 'CentOS'
+        and ansible_distribution_major_version = '8'
+
     - name: Ensure OS-Agnostic dependencies are present in test image
       package:
         name: "{{ package_dependencies }}"

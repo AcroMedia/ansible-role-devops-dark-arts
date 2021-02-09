@@ -737,7 +737,7 @@ function sanity_checks_pass() {
     return 1
   }
   if ! type chsh > /dev/null; then
-    err "The command chsh was not found in PATH. On Ubuntu and RedHat, chsh is usually present by default. On Amazon Linux, you need to install the 'util-linux-user' package first."
+    err "The command chsh was not found in PATH. On Ubuntu (all versions) and RedHat 6/7, chsh is usually present by default. On Amazon Linux, RedHat/CentOS 8 you need to install the 'util-linux-user' package first."
     return 1
   fi
 }
