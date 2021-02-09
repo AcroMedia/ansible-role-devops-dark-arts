@@ -41,7 +41,7 @@
         update_cache: yes
       when: ansible_os_family == 'RedHat'
 
-      - name: Ensure OS-specific dependencies are present in test image
+    - name: Ensure OS-specific dependencies are present in test image
       package:
         name: "{{ package_dependencies }}"
         state: present
