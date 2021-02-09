@@ -116,7 +116,7 @@ function check_maintenance_mode_off() {
     fi
   fi
 
-  if test -z "$MM"; then
+  if [ -z "${MM:-}" ]; then
     echo "Maintenance mode is either unspecified (off), or drush isn't working. Assuming site is online."
     echo ""
     return;
