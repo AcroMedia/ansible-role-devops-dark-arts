@@ -5,7 +5,7 @@
 
 function main() {
   echo ''
-  echo 'Drupal 7: Run this script from your Drupal Root.'
+  echo 'Drupal 7: Run this script from your Drupal Root (eg subdir), if it is not the same as your web root.'
   echo 'Drupal 8: Run this script from your Web Root.'
   echo ''
   check_prerequisites
@@ -25,6 +25,12 @@ function check_prerequisites() {
   require_root_e
   require_script "/usr/bin/stat"
   require_script "/usr/bin/id"
+  if mount | grep nfs ; then
+    cerr "##################################################################################################"
+    cerr "Warning: A mounted NFS share was dectected. If you don't know exactly what you're doing, stop now."
+    cerr "##################################################################################################"
+
+  fi
 }
 
 function seed_dummy_variables() {
@@ -235,7 +241,21 @@ function get_public_files_path() {
       DEFAULT_VALUE="sites/default/files"
     fi
   fi
-  PUBLIC_FILES="$(prompt_for_value_with_default "PUBLIC_FILES" "$DEFAULT_VALUE")"
+  while [ -z "${PUBLIC_FILES:-}" ]; do
+    PUBLIC_FILES="$(prompt_for_value_with_default "PUBLIC_FILES" "$DEFAULT_VALUE")"
+    if [ -n "${PUBLIC_FILES}" ] && [ ! -d "$PUBLIC_FILES/" ]; then
+      err "PUBLIC_FILES dir does not exist: $PUBLIC_FILES/"
+      PUBLIC_FILES=''
+    fi
+  done
+  PUBLIC_FILES_RESOLVED=$(resolve_path "$PUBLIC_FILES")
+  if df -P "$PUBLIC_FILES_RESOLVED" | grep -ow "$PUBLIC_FILES_RESOLVED"; then
+    cerr "###############################################################################################"
+    cerr "WARNING: PUBLIC_FILES appears to be a mounted directory, which is NOT supported by this script."
+    cerr "Seting permissions across NFS shares can do more harm than good. PROCEED AT YOUR OWN RISK."
+    cerr "###############################################################################################"
+  fi
+
   echo ""
 }
 
@@ -248,7 +268,25 @@ function get_private_files_path() {
   else
     DEFAULT_VALUE="$(safe_vget file_private_path)"
   fi
-  PRIVATE_FILES="$(prompt_for_value_with_default "PRIVATE_FILES" "$DEFAULT_VALUE")"
+  PRIVATE_FILES='__invalid__'
+  while [[ "${PRIVATE_FILES}" == '__invalid__' ]]; do
+    PRIVATE_FILES="$(prompt_for_value_with_default "PRIVATE_FILES" "$DEFAULT_VALUE")"
+    if [ -n "${PRIVATE_FILES}" ]; then
+      if [ ! -d "${PRIVATE_FILES}/" ]; then
+        err "PRIVATE_FILES dir does not exist: ${PRIVATE_FILES}"
+        PRIVATE_FILES='__invalid__'
+      fi
+    fi
+  done
+  if [ -n "${PRIVATE_FILES}" ]; then
+    PRIVATE_FILES_RESOLVED=$(resolve_path "$PRIVATE_FILES")
+    if df -P "$PRIVATE_FILES_RESOLVED" | grep -ow "$PRIVATE_FILES_RESOLVED"; then
+      cerr "###############################################################################################"
+      cerr "WARNING: PRIVATE_FILES appears to be a mounted directory, which is NOT supported by this script."
+      cerr "Seting permissions across NFS shares can do more harm than good. PROCEED AT YOUR OWN RISK."
+      cerr "###############################################################################################"
+    fi
+  fi
   echo ""
 }
 
@@ -527,20 +565,17 @@ function verify_drupal_structure() {
     err "Could not find any settings.php files inside $DRUPAL_SITES_DIR"
     ERRORS=$((ERRORS + 1))
   fi
-  test -e "$PUBLIC_FILES/" || {
-    err "PUBLIC_FILES does not exist: $PUBLIC_FILES/"
-    ERRORS=$((ERRORS + 1))
-  }
-  test -e "$PRIVATE_FILES/" || {
-    warn "PRIVATE_FILES does not exist: $PRIVATE_FILES/"
-    echo ""
-    # Drupal can function without a private files dir. This isn't a fatal error.
-  }
   if [ "$ERRORS" -gt 0 ]; then
     info "Make sure you're running this script from Drupal root, and that (a) your installation either conforms to a standard structure, or (b) you're specifying the correct paths to the alternate structure."
     abort
   fi
 }
+
+function resolve_path () {
+  local ARG=$1
+  realpath -- "${ARG}" || readlink -f -- "${ARG}" || perl -MCwd -le 'print Cwd::abs_path shift' -- "${ARG}"   # ubuntu || redhat || mac os compatible.
+}
+
 
 function require_script () {
   type "$1" > /dev/null  2>&1 || {
