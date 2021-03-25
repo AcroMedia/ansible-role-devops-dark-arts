@@ -438,7 +438,7 @@ function sanity_checks_pass () {
     DPKG_SERVER="nginx"
   fi
 
-  echo "$PACKAGELIST" | grep -w "${DPKG_SERVER}" |grep -qE 'ubuntu|trusty|bionic' || {
+  echo "$PACKAGELIST" | grep -w "${DPKG_SERVER}" |grep -qE 'ubuntu|trusty|bionic|focal' || {
      warn "This script only supports NGINX/Apache2 on Ubuntu 14.04 or newer. Proceed at your own risk."
   }
 
