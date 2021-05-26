@@ -476,6 +476,8 @@ function sanity_checks_pass () {
      : # OK
   elif  [[ "${PHP_VERSION}" == "7.3" ]]; then
      : # OK
+  elif  [[ "${PHP_VERSION}" == "7.4" ]]; then
+    : # OK
   else
     cerr "${BOLD}ERR:${UNBOLD} This script isn't built to handle a PHP_VERSION value of: $PHP_VERSION"
     cerr "The PHP_VERSION variable is used to name some files, and to control services."
