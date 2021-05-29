@@ -6,7 +6,7 @@ function main () {
     warn 'This script should be run as root to avoid permissions problems.'
   fi
 
-  if aws --version | grep -qw 'aws-cli'; then
+  if aws --version 2>&1 | grep -qw 'aws-cli'; then
     true
   else
     err 'No AWS CLI utility found.'
