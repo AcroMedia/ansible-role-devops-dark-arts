@@ -79,9 +79,20 @@ function main () {
   S3_ARCHIVE_FILENAME=$(basename "$S3_ARCHIVE_DEST")
   S3_ARCHIVE_CONTAINER=$(dirname "$S3_ARCHIVE_DEST")
 
+  #  Try writing to the container first; if its a sub-directory that doesnt exist yet, this will create it and keep the filtered_list test from failing.
+  if ! (echo "write-test" | aws s3 cp - "${S3_ARCHIVE_CONTAINER}/._write_permissions_test"); then
+    cerr ''
+    cerr "The test to see if we can write to ${S3_ARCHIVE_CONTAINER} failed."
+    cerr "Check for misspellings, make sure you have bucket read/write permissions, and try again."
+    cerr '✘'
+    exit 1
+  fi
+
+  # List the bucket contents so we can refuse to overwrite existing objects.
   BUCKET_LIST=$(aws s3 ls "$S3_ARCHIVE_CONTAINER") || {
     cerr ''
-    cerr "The test to see if we can access ${S3_ARCHIVE_CONTAINER}, (before spending a lot of effort bundling up files) failed."
+    cerr "The test to see if we read the contents of ${S3_ARCHIVE_CONTAINER} failed."
+    cerr "Since the script checks contents to make sure it wont overwrite existing files, read access to the bucket is necessary."
     cerr "Check for misspellings, make sure you have bucket read/write permissions, and try again."
     cerr '✘'
     exit 1
