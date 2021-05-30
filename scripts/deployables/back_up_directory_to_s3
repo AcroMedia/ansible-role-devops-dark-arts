@@ -57,14 +57,18 @@ function main () {
 
   if [[ "$S3_ARCHIVE_DEST" =~ ^s3://.*/.*\.tgz$ ]]; then
     true
+  elif [[ "$S3_ARCHIVE_DEST" =~ ^s3://.*/.*\.tar$ ]]; then
+      true
   else
-    err "S3_ARCHIVE_DEST must be a fully formed path, including the protocol and a .tgz filename extension. E.g: s3://bucket-name/file-name.tgz'"
+    err "S3_ARCHIVE_DEST must be a fully formed path, including the protocol and a tgz or tar filename extension. E.g: s3://bucket-name/file-name.tgz'"
   fi
 
   if [[ "$S3_ARCHIVE_DEST" =~ \.tgz$ ]]; then
     true
+  elif [[ "$S3_ARCHIVE_DEST" =~ \.tar$ ]]; then
+    true
   else
-    err "S3_ARCHIVE_DEST must end with '.tgz'"
+    err "S3_ARCHIVE_DEST must end with '.tgz' or '.tar'"
   fi
 
   if [ "$ERRORS" -gt 0 ]; then
@@ -91,7 +95,11 @@ function main () {
   else
     local REL_DIR
     REL_DIR=$(echo -n "$ABS_DIR" | sed -e 's/^\///')
-    tar --directory=/ --create "$REL_DIR" | gzip -c | aws s3 cp - "$S3_ARCHIVE_DEST"
+    if [[ "$S3_ARCHIVE_DEST" =~ \.tgz$ ]]; then
+      tar --directory=/ --create "$REL_DIR" | gzip -c | aws s3 cp - "$S3_ARCHIVE_DEST"
+    else
+      tar --directory=/ --create "$REL_DIR" | aws s3 cp - "$S3_ARCHIVE_DEST"
+    fi
     echo "$S3_ARCHIVE_DEST"  # Our only output to stdout is the file we created.
   fi
   cerr "✔"
