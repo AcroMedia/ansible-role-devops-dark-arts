@@ -1402,7 +1402,9 @@ function prompt_for_value_with_default() {
   local VARIABLE_NAME="$1"
   local DEFAULT_VALUE="$2"
   local VARIABLE_VALUE
-  if bash --version |head -1|grep -qoi 'version 4'; then
+  if bash --version |head -1|grep -qoi 'version 5'; then
+    read -r -e -p "$VARIABLE_NAME: " -i "$DEFAULT_VALUE" VARIABLE_VALUE
+  elif bash --version |head -1|grep -qoi 'version 4'; then
     read -r -e -p "$VARIABLE_NAME: " -i "$DEFAULT_VALUE" VARIABLE_VALUE
   elif bash --version |head -1|grep -qoi 'version 3'; then
     read -r -p "$VARIABLE_NAME [$DEFAULT_VALUE]: " VARIABLE_VALUE
@@ -1410,7 +1412,8 @@ function prompt_for_value_with_default() {
       VARIABLE_VALUE="$DEFAULT_VALUE"
     fi
   else
-    fatal "Unidentified bash version."
+    fatal "Unhandled bash version."
+    exit 1
   fi
   # Return the value to the caller.
   echo "$VARIABLE_VALUE"
