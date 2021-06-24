@@ -29,8 +29,27 @@ NOLOGIN='' # will be set later.
 # If LE is installed, enable SSL. The site owner can either leave the LE cert, or they can
 # spend the extra dough and have a 'real' cert installed, which covers the cost of manual installation.
 #----------------------------------------------------------------------------
+function find_certbot() {
+  # Letsencrypt has flip-flopped with its name and location over the years.
+  # Simply doing a "which" may hit the wrong one if legacy versions are still around.
+  if [ -e /snap/bin/certbot ]; then   # Snap version, 2020
+    echo /snap/bin/certbot
+    return 0
+  elif [ -e /usr/local/bin/certbot-auto ]; then  # Self-updating script version, 2019ish, now deprecated.
+    echo /usr/local/bin/certbot-auto
+    return 0
+  elif [ -e /usr/bin/certbot ]; then   # Package version, 2018ish, now deprecated.
+    echo /usr/bin/certbot
+    return 0
+  else
+    # Try and guess, prioritizing the current name.
+    which certbot || which certbot-auto || {
+      >&2 echo "No certbot or certbot-auto found"  # This is only a courtesey messsage. Be sure not to emit to stdout, and be sure not to exit with an error; The presence of certbot is not a requirement here.
+    }
+  fi
+}
 readonly LE_LIVE_DIR="/etc/letsencrypt/live"
-readonly CERTBOT="/usr/local/bin/certbot-auto"
+CERTBOT=$(find_certbot)
 readonly LE_WWW="/var/www/letsencrypt"
 
 # Set default, and override later
