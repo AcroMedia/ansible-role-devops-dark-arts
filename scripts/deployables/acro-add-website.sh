@@ -29,8 +29,27 @@ NOLOGIN='' # will be set later.
 # If LE is installed, enable SSL. The site owner can either leave the LE cert, or they can
 # spend the extra dough and have a 'real' cert installed, which covers the cost of manual installation.
 #----------------------------------------------------------------------------
+function find_certbot() {
+  # Letsencrypt has flip-flopped with its name and location over the years.
+  # Simply doing a "which" may hit the wrong one if legacy versions are still around.
+  if [ -e /snap/bin/certbot ]; then   # Snap version, 2020
+    echo /snap/bin/certbot
+    return 0
+  elif [ -e /usr/local/bin/certbot-auto ]; then  # Self-updating script version, 2019ish, now deprecated.
+    echo /usr/local/bin/certbot-auto
+    return 0
+  elif [ -e /usr/bin/certbot ]; then   # Package version, 2018ish, now deprecated.
+    echo /usr/bin/certbot
+    return 0
+  else
+    # Try and guess, prioritizing the current name.
+    which certbot || which certbot-auto || {
+      >&2 echo "No certbot or certbot-auto found"  # This is only a courtesey messsage. Be sure not to emit to stdout, and be sure not to exit with an error; The presence of certbot is not a requirement here.
+    }
+  fi
+}
 readonly LE_LIVE_DIR="/etc/letsencrypt/live"
-readonly CERTBOT="/usr/local/bin/certbot-auto"
+CERTBOT=$(find_certbot)
 readonly LE_WWW="/var/www/letsencrypt"
 
 # Set default, and override later
@@ -428,7 +447,7 @@ function sanity_checks_pass () {
     PACKAGELIST=$(/bin/rpm -qa)
   else
     err "Could not query packages from OS. Aborting."
-    exit 358
+    exit 254
   fi
   local DPKG_SERVER
   if [ "${WEBSERVER}" == "apache" ]; then
@@ -518,7 +537,7 @@ function sanity_checks_pass () {
     test -f "$FPM_CONF_TEMPLATE" || {
       # Even if we dont use this, it should still exist
       err "PHP FPM template file does not exist: $FPM_CONF_TEMPLATE"
-      exit 454
+      exit 254
     }
     # mysql
     test -f "$SETTINGS_LOCAL_TEMPLATE" || {
@@ -562,15 +581,15 @@ function sanity_checks_pass () {
   # Postfix
   type /usr/bin/newaliases > /dev/null 2>&1 || {
     cerr "${BOLD}ERR:${UNBOLD} Missing 'newaliases' command."
-    exit 474
+    exit 254
   }
   [[ -e /etc/aliases ]] || {
     cerr "${BOLD}ERR:${UNBOLD} File not found: /etc/aliases"
-    exit 474
+    exit 254
   }
   service postfix status > /dev/null || {
     cerr "${BOLD}ERR:${UNBOLD} Could not get postfix status"
-    exit 474
+    exit 254
   }
 
   # Figure out which shell to set to set for PHP service user
@@ -580,7 +599,7 @@ function sanity_checks_pass () {
     NOLOGIN=/sbin/nologin
   else
     err "Could not determine which shell to set for service accounts. Aborting."
-    exit 770
+    exit 254
   fi
 
   if tty --quiet; then  # Is this an interactive session?
@@ -606,20 +625,20 @@ function validate_account_string () {
   local USERACCOUNT="$1"
   if test -z "$USERACCOUNT"; then
     usage
-    exit 462
+    exit 254
   fi
   if ! is_sane_account_string "$USERACCOUNT"; then
     cerr "${BOLD}ERR:${UNBOLD} Invalid account name: '$USERACCOUNT'. Account names must be less than $MAX_ACCOUNT_STRING_LENGTH chars, start with an alpha and contain only alphanmeric, dash, or underscore characters."
     usage
-    exit 467
+    exit 254
   fi
   if is_system_user "$USERACCOUNT"; then
     cerr "${BOLD}ERR:${UNBOLD} '$USERACCOUNT' is a system account."
-    exit 471
+    exit 254
   fi
   if echo "$USERACCOUNT" | grep -q -- "-srv$"; then
     cerr "${BOLD}ERR:${UNBOLD} User account names shouldn't end in '-srv'. That distinction is reserved for service account names."
-    exit 475
+    exit 254
   fi
   if test -d "$HOMEROOT/$USERACCOUNT"; then
     local STATCODE
@@ -632,7 +651,7 @@ function validate_account_string () {
         cerr "This condition most commonly occurs when trying to create a site in an administrator's home directory."
         cerr "The account you specify to create a site should either be new, or a non-privileged user instead."
         if ! require_yes_or_no "Are you sure you want to continue?"; then
-          exit 488
+          exit 254
         fi
       fi
     fi
@@ -675,7 +694,7 @@ function is_system_user () {
     ID_BOUNDARY=1000
   else
     err "is_system_user(): No yum or dpkg? Can't guess where system user ids begin / end."
-    exit 607
+    exit 254
   fi
   USERID=$(id -u -- "$USERNAME")
   if [ "$USERID" -lt $ID_BOUNDARY ]; then
@@ -689,16 +708,16 @@ function validate_project_string () {
   local PROJECT="$1"
   if test -z "$PROJECT"; then
     usage
-    exit 528
+    exit 254
   fi
   if ! is_sane_project_string "$PROJECT"; then
     cerr "${BOLD}ERR:${UNBOLD} bad project string (must be less than $MAX_ACCOUNT_STRING_LENGTH chars with no punctuation): $PROJECT"
     usage
-    exit 533
+    exit 254
   fi
   if echo "$PROJECT" | grep -q -- "-srv$"; then
     cerr "${BOLD}ERR:${UNBOLD} Project names shouldn't end in '-srv'. That distinction is reserved for service account names."
-    exit 537
+    exit 254
   fi
 
 }
@@ -712,7 +731,7 @@ function validate_fqdn () {
   if ! is_sane_fqdn "$FQDN"; then
     cerr "${BOLD}ERR:${UNBOLD} bad fqdn string: $FQDN"
     usage
-    exit 551
+    exit 254
   fi
 }
 
@@ -893,7 +912,7 @@ function assert_real_user () {
   if ! useradd -m "$USERACCOUNT"; then
     warn "Useradd exited with an error"
     if [ $FORCE -ne 1 ] ; then
-      exit 714
+      exit 254
     fi
   fi
   if test -x /bin/bash; then
@@ -911,12 +930,12 @@ function assert_service_user () {
   fi
   if ! useradd --system "$SERVICEACCOUNT"; then
     if [ $FORCE -ne 1 ] ; then
-      exit 728
+      exit 254
     fi
   fi
   if ! chsh --shell $NOLOGIN "$SERVICEACCOUNT"; then
     if [ $FORCE -ne 1 ] ; then
-      exit 853
+      exit 254
     fi
   fi
 }
@@ -934,7 +953,7 @@ function assert_user_in_group () {
     fi
   else
     cerr "${BOLD}ERR:${UNBOLD} assert_user_in_group(): group does not exist: $GROUP"
-    exit 746
+    exit 254
   fi
 }
 
@@ -1044,14 +1063,14 @@ function lets_encrypt () {
   if test -e "$REAL_VHOST"; then
     err "Vhost already exists: $REAL_VHOST"
     if [ $FORCE -ne 1 ]; then
-      exit 845
+      exit 254
     fi
   fi
 
   if test -e "$ENABLED_VHOST"; then
     err "Vhost is already enabled: $ENABLED_VHOST"
     if [ $FORCE -ne 1 ]; then
-      exit 850
+      exit 254
     fi
   fi
 
@@ -1087,7 +1106,7 @@ function lets_encrypt () {
         cerr "This probably means a previous attempt to create the site was successful in registering the SSL cert, but failed somewhere else."
         if ! require_yes_or_no "Do you want to ignore the letsencrypt error and continue with site setup?"; then
           rm "$REAL_VHOST" "$ENABLED_VHOST"
-          exit 881
+          exit 254
         fi
       else
         # We're probably running from a playbook ... Assume the scenario described above and try getting past it with the "--keep" flag.
@@ -1097,12 +1116,12 @@ function lets_encrypt () {
         else
           rm "$REAL_VHOST" "$ENABLED_VHOST"
           err "Could not register or keep LE SSL cert ... manual intervention is required."
-          exit 1068
+          exit 254
         fi
       fi
     else
       rm "$REAL_VHOST" "$ENABLED_VHOST"
-      exit 884
+      exit 254
     fi
   fi
 
@@ -1293,7 +1312,7 @@ function mysql_db_exists () {
     else
       # False negative: Abort the script.
       cerr "ERR (mysql_db_exists): $RESULT"
-      exit 1037
+      exit 254
     fi
   fi
 }
@@ -1332,20 +1351,20 @@ function prevent_name_collisions () {
     cerr "${BOLD}ERR:${UNBOLD} The linux user '$SERVICEACCOUNT' (for services) already exists."
     cerr "$NAME_COLLISION_HELP"
     usage
-    exit 1076
+    exit 254
   fi
   if [ $USE_MYSQL -eq 1 ]; then
     if mysql_db_exists "$DBNAME"; then
       cerr "${BOLD}ERR:${UNBOLD} The mysql database '$DBNAME' already exists."
       cerr "$NAME_COLLISION_HELP"
       usage
-      exit 1082
+      exit 254
     fi
     if mysql_user_exists "$DBUSER" "${MYSQL_ALLOW_FROM}"; then
       cerr "${BOLD}ERR:${UNBOLD} The mysql user '$DBUSER' already exists."
       cerr "$NAME_COLLISION_HELP"
       usage
-      exit 1088
+      exit 254
     fi
   fi
   if [[ "$PHP_VERSION" != 'none' ]]; then
@@ -1353,20 +1372,20 @@ function prevent_name_collisions () {
       cerr "${BOLD}ERR:${UNBOLD} The socket file '$SOCKET_FILE' already exists."
       cerr "$NAME_COLLISION_HELP"
       usage
-      exit 1094
+      exit 254
     fi
     if test -e "$FPM_POOL_CONF"; then
       cerr "${BOLD}ERR:${UNBOLD} The FPM pool '$FPM_POOL_CONF' already exists."
       cerr "$NAME_COLLISION_HELP"
       usage
-      exit 1100
+      exit 254
     fi
   fi
   if test -e "$REAL_VHOST" || test -e "$ENABLED_VHOST"; then
     cerr "${BOLD}ERR:${UNBOLD} There is already a virtual host using the name '$FQDN' on this server."
     cerr "$NAME_COLLISION_HELP"
     usage
-    exit 1106
+    exit 254
   fi
 }
 
@@ -1374,7 +1393,7 @@ function prevent_name_collisions () {
 function ctrl_c() {
   # When using "read -e", weird things happen if ctrl + c gets called. Stty sane fixes that. Could also use 'reset' but thats really aggressive.
   stty sane
-  exit 1114
+  exit 254
 }
 
 function prompt_for_value_with_default() {
@@ -1383,7 +1402,9 @@ function prompt_for_value_with_default() {
   local VARIABLE_NAME="$1"
   local DEFAULT_VALUE="$2"
   local VARIABLE_VALUE
-  if bash --version |head -1|grep -qoi 'version 4'; then
+  if bash --version |head -1|grep -qoi 'version 5'; then
+    read -r -e -p "$VARIABLE_NAME: " -i "$DEFAULT_VALUE" VARIABLE_VALUE
+  elif bash --version |head -1|grep -qoi 'version 4'; then
     read -r -e -p "$VARIABLE_NAME: " -i "$DEFAULT_VALUE" VARIABLE_VALUE
   elif bash --version |head -1|grep -qoi 'version 3'; then
     read -r -p "$VARIABLE_NAME [$DEFAULT_VALUE]: " VARIABLE_VALUE
@@ -1391,7 +1412,8 @@ function prompt_for_value_with_default() {
       VARIABLE_VALUE="$DEFAULT_VALUE"
     fi
   else
-    fatal "Unidentified bash version."
+    fatal "Unhandled bash version."
+    exit 1
   fi
   # Return the value to the caller.
   echo "$VARIABLE_VALUE"
