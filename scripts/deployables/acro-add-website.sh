@@ -100,9 +100,9 @@ fi
 
 
 if [ $# -gt 0 ] && (/usr/local/bin/optional-parameter-exists "--skip-ssl" "$@" ||  /usr/local/bin/optional-parameter-exists "--no-ssl" "$@"); then
-  : # SSL has been disabled by request
+  cerr "SSL has been disabled by request"
 elif test -e "$LE_WWW/.well-known/acme-challenge" && test -x "$CERTBOT"; then
-  # Use certbot if it's available
+  cerr "Certbot is available"
   USE_LE=1
   USE_SSL=1
   VHOST_CONF_STUB="-ssl"

@@ -7,6 +7,7 @@ server {
   client_max_body_size 100m;
   access_log {{ access_log }};
   error_log {{ error_log }};
+  include /etc/nginx/includes/letsencrypt-acme-challenge.conf;   # Always include acme challenge, even if the site does not use SSL, so the site *can* switch to ssl if needed.
 
   # Enable compression. This will help if you have, for instance, the advagg module
   # by serving Gzip versions of the files.
