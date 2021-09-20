@@ -61,6 +61,7 @@ RCNFFILE += add-website.conf.php7.1
 RCNFFILE += add-website.conf.php7.2
 RCNFFILE += add-website.conf.php7.3
 RCNFFILE += add-website.conf.php7.4
+RCNFFILE += add-website.conf.php8.0
 RCNFFILE += add-website.conf.phpnone
 RCNFFILE += add-user.conf.example
 RCNFFILE += add-user.data.example
