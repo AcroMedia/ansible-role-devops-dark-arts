@@ -17,7 +17,7 @@ elif [ -d "/etc/nginx/conf.d" ] \
   NGINX_SITES_AVAILABLE="/etc/nginx/conf.d"
   NGINX_SITES_ENABLED="/tmp" # Throwaway. Adding a site to conf.d doensn't require a symlink to enable it.
 else
-  >&2 echo "I don't know where to create nginx configs. Manual intervention is required in /etc/acro/add-website.conf.phpnone."
+  >&2 echo "I don't know where to create nginx configs. Manual intervention is required in /etc/acro/add-website.conf.php${PHP_VERSION}."
   exit 1
 fi
 readonly APACHE_SITES_AVAILABLE="/etc/apache2/sites-available"
