@@ -49,6 +49,7 @@ RCNFFILE += php7.1-fpm-pool-conf-template.j2
 RCNFFILE += php7.2-fpm-pool-conf-template.j2
 RCNFFILE += php7.3-fpm-pool-conf-template.j2
 RCNFFILE += php7.4-fpm-pool-conf-template.j2
+RCNFFILE += php8.0-fpm-pool-conf-template.j2
 RCNFFILE += placeholder
 RCNFFILE += drupal-settings-local-php.j2
 RCNFFILE += logrotate.d-vhost.j2
