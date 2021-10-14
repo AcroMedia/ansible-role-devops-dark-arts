@@ -1,29 +1,4 @@
 #!/bin/bash -ue
-readonly ACROCONFROOT="/etc/acro"
-
-BOLD=$(tput bold 2>/dev/null) || BOLD='\033[1;33m' # orange, if tput isnt available.
-UNBOLD=$(tput sgr0 2>/dev/null) || UNBOLD='\033[m'
-
-
-
-if ! [[ $EUID -eq 0 ]]; then
-  >&2 echo "${BOLD}ERR:${UNBOLD} This script must be run as root. Try: sudo -i $(basename "$0")"
-  exit 12
-fi
-
-#############################################################################
-# @TODO: In order of priority:
-# - Make sure naked domain name gets appended to nginx 'server_name's when fqdn starts with 'www.'
-# - Allow user-specified values for all the things
-# - Clean up SSL configuration ...it got messy.
-# - Stop writing in BASH, dumbass. It's impossible to maintain.
-#----------------------------------------------------------------------------
-
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-NOLOGIN='' # will be set later.
 
 #############################################################################
 # If LE is installed, enable SSL. The site owner can either leave the LE cert, or they can
@@ -48,115 +23,10 @@ function find_certbot() {
     }
   fi
 }
-readonly LE_LIVE_DIR="/etc/letsencrypt/live"
-CERTBOT=$(find_certbot)
-readonly LE_WWW="/var/www/letsencrypt"
 
-# Set default, and override later
-USE_LE=0
-USE_SSL=0
-VHOST_CONF_STUB=""
-
-IS_RDS=0
-
-if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--rds" "$@"; then
-  IS_RDS=1
-fi
-
-FORCE=0
-if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--force" "$@"; then
-  FORCE=1
-  >&2 echo "FORCE=1 has been specified. Errors will be ignored. Good luck, soldier."
-fi
-
-WEBSERVER="nginx"
-if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--apache" "$@"; then
-  # Apache on Ubuntu
-  WEBSERVER="apache"
-elif [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--httpd" "$@"; then
-  # Apache on Red Hat
-  WEBSERVER="httpd"
-fi
-
-# Allow creation of a site without MySQL ... this is meant to be used along with "--php-version none"
-USE_MYSQL=1
-if [ $# -gt 0 ] && (/usr/local/bin/optional-parameter-exists "--skip-mysql" "$@" || /usr/local/bin/optional-parameter-exists "--no-mysql" "$@"); then
-  USE_MYSQL=0
-else
-  if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--mysql-allow-from" "$@"; then
-    MYSQL_ALLOW_FROM="$(/usr/local/bin/require-named-parameter "--mysql-allow-from" "$@")"
-  else
-    MYSQL_ALLOW_FROM='localhost'
-  fi
-
-  # @TODO See if we can detect this from the mysql connection that we're on, intead of having to provide it manually.
-  #       Parse it out of /root/.my.cnf maybe? Can we find this out from the mysql cli client?
-  if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--mysql-host-address" "$@"; then
-    MYSQL_HOST_ADDRESS="$(/usr/local/bin/require-named-parameter "--mysql-host-address" "$@")"
-  else
-    MYSQL_HOST_ADDRESS='localhost'
-  fi
-fi
-
-
-if [ $# -gt 0 ] && (/usr/local/bin/optional-parameter-exists "--skip-ssl" "$@" ||  /usr/local/bin/optional-parameter-exists "--no-ssl" "$@"); then
-  cerr "SSL has been disabled by request"
-elif test -e "$LE_WWW/.well-known/acme-challenge" && test -x "$CERTBOT"; then
-  cerr "Certbot is available"
-  USE_LE=1
-  USE_SSL=1
-  VHOST_CONF_STUB="-ssl"
-fi
-
-# Provide some feedback
-if [ ${USE_LE} -eq 1 ]; then
-  >&2 printf "LetsEncrypt Automatic SSL: %bEnabled%b    (use --skip-ssl to disable)\n" "${GREEN}" "${NC}"
-else
-  >&2 printf "LetsEncrypt Automatic SSL: %bDisabled%b\n" "${RED}" "${NC}"
-fi
-
-export USE_LE
-export USE_SSL
-export VHOST_CONF_STUB
 
 #############################################################################
-# Get configuration from an external file
 #----------------------------------------------------------------------------
-
-if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--php-version" "$@"; then
-  PHP_VERSION="$(/usr/local/bin/require-named-parameter "--php-version" "$@")"
-  readonly ACROCONF="${ACROCONFROOT}/add-website.conf.php${PHP_VERSION}"
-else
-  readonly ACROCONF="${ACROCONFROOT}/add-website.conf"
-fi
-
-test -e "${ACROCONF}" || {
-  >&2 echo "${BOLD}ERR:${UNBOLD} Missing configuration file: '${ACROCONF}'"
-  >&2 echo "If you are seeing this message (and you did not explictly specify a PHP version to use), it means the configuration for this script has not yet been linked."
-  >&2 echo "To fix the problem, create a symlink to one of the master configs in the ${ACROCONFROOT} directory as 'add-website.conf':"
-  >&2 echo "i.e:"
-  >&2 echo "  cd ${ACROCONFROOT} && sudo ln -s 'add-website.conf.php7.2' 'add-website.conf'"
-  >&2 echo "or"
-  >&2 echo "  cd ${ACROCONFROOT} && sudo ln -s 'add-website.conf.php5' 'add-website.conf'"
-  >&2 echo "If you DID specify a PHP version, it means the version you specified isn't supported or doesn't exist."
-  exit 92
-}
-source "${ACROCONF}"
-
->&2 printf "HTTP daemon to use.......: %b%s%b\n" "${BLUE}" "${WEBSERVER}" "${NC}"
-if [[ "$PHP_VERSION" == 'none' ]]; then
-  >&2 printf "PHP FPM version to use...: %b%s%b\n" "${RED}" "${PHP_VERSION}" "${NC}        (specify a different version with: --php-version X.X)"
-else
-  >&2 printf "PHP FPM version to use...: %b%s%b\n" "${BLUE}" "${PHP_VERSION}" "${NC}        (specify a different version with: --php-version X.X)"
-fi
->&2 printf "\n"
-
-ACTIVITY_LOG="/var/log/acro-add-website.log"
-
-#############################################################################
-# The main event.
-#----------------------------------------------------------------------------
-
 function main () {
 
   set +o pipefail # Turning this back off (it was set just before calling main) because the script wasn't written with it on, and I haven't had time to test the effects.
@@ -1228,7 +1098,7 @@ function assert_logrotate_things () {
 # Make sure there's a mapping in /etc/aliases for both the web account owner and the PHP owner, so that
 # when a cron job burps out an error, someone actually finds out about it.
 # Previous to this, we've found local mailboxes that were hundreds of MB large with errors that no one had any clue about.
-assert_postfix_aliases () {
+function assert_postfix_aliases () {
   local DO_POSTFIX_RELOAD=0
   if ! grep -w "^${USERACCOUNT}" /etc/aliases; then
     echo "${USERACCOUNT}: ${RESPONSIBLE_PERSON}" >> /etc/aliases
@@ -1435,6 +1305,132 @@ function usage () {
   cerr "  Any paramater you don't specify will be asked for interactively."
   cerr "  See https://wiki.acromediainc.com/wiki/Acro-add-website.sh for full documentation."
 }
+
+
+
+readonly ACROCONFROOT="/etc/acro"
+
+BOLD=$(tput bold 2>/dev/null) || BOLD='\033[1;33m' # orange, if tput isnt available.
+UNBOLD=$(tput sgr0 2>/dev/null) || UNBOLD='\033[m'
+
+
+
+if ! [[ $EUID -eq 0 ]]; then
+  >&2 echo "${BOLD}ERR:${UNBOLD} This script must be run as root. Try: sudo -i $(basename "$0")"
+  exit 12
+fi
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+NOLOGIN='' # will be set later.
+
+readonly LE_LIVE_DIR="/etc/letsencrypt/live"
+CERTBOT=$(find_certbot)
+readonly LE_WWW="/var/www/letsencrypt"
+
+# Set default, and override later
+USE_LE=0
+USE_SSL=0
+VHOST_CONF_STUB=""
+
+IS_RDS=0
+
+if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--rds" "$@"; then
+  IS_RDS=1
+fi
+
+FORCE=0
+if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--force" "$@"; then
+  FORCE=1
+  >&2 echo "FORCE=1 has been specified. Errors will be ignored. Good luck, soldier."
+fi
+
+WEBSERVER="nginx"
+if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--apache" "$@"; then
+  # Apache on Ubuntu
+  WEBSERVER="apache"
+elif [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--httpd" "$@"; then
+  # Apache on Red Hat
+  WEBSERVER="httpd"
+fi
+
+# Allow creation of a site without MySQL ... this is meant to be used along with "--php-version none"
+USE_MYSQL=1
+if [ $# -gt 0 ] && (/usr/local/bin/optional-parameter-exists "--skip-mysql" "$@" || /usr/local/bin/optional-parameter-exists "--no-mysql" "$@"); then
+  USE_MYSQL=0
+else
+  if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--mysql-allow-from" "$@"; then
+    MYSQL_ALLOW_FROM="$(/usr/local/bin/require-named-parameter "--mysql-allow-from" "$@")"
+  else
+    MYSQL_ALLOW_FROM='localhost'
+  fi
+
+  # @TODO See if we can detect this from the mysql connection that we're on, intead of having to provide it manually.
+  #       Parse it out of /root/.my.cnf maybe? Can we find this out from the mysql cli client?
+  if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--mysql-host-address" "$@"; then
+    MYSQL_HOST_ADDRESS="$(/usr/local/bin/require-named-parameter "--mysql-host-address" "$@")"
+  else
+    MYSQL_HOST_ADDRESS='localhost'
+  fi
+fi
+
+
+if [ $# -gt 0 ] && (/usr/local/bin/optional-parameter-exists "--skip-ssl" "$@" ||  /usr/local/bin/optional-parameter-exists "--no-ssl" "$@"); then
+  cerr "SSL has been disabled by request"
+elif test -e "$LE_WWW/.well-known/acme-challenge" && test -x "$CERTBOT"; then
+  cerr "Certbot is available"
+  USE_LE=1
+  USE_SSL=1
+  VHOST_CONF_STUB="-ssl"
+fi
+
+# Provide some feedback
+if [ ${USE_LE} -eq 1 ]; then
+  >&2 printf "LetsEncrypt Automatic SSL: %bEnabled%b    (use --skip-ssl to disable)\n" "${GREEN}" "${NC}"
+else
+  >&2 printf "LetsEncrypt Automatic SSL: %bDisabled%b\n" "${RED}" "${NC}"
+fi
+
+export USE_LE
+export USE_SSL
+export VHOST_CONF_STUB
+
+#############################################################################
+# Get configuration from an external file
+#----------------------------------------------------------------------------
+
+if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--php-version" "$@"; then
+  PHP_VERSION="$(/usr/local/bin/require-named-parameter "--php-version" "$@")"
+  readonly ACROCONF="${ACROCONFROOT}/add-website.conf.php${PHP_VERSION}"
+else
+  readonly ACROCONF="${ACROCONFROOT}/add-website.conf"
+fi
+
+test -e "${ACROCONF}" || {
+  >&2 echo "${BOLD}ERR:${UNBOLD} Missing configuration file: '${ACROCONF}'"
+  >&2 echo "If you are seeing this message (and you did not explictly specify a PHP version to use), it means the configuration for this script has not yet been linked."
+  >&2 echo "To fix the problem, create a symlink to one of the master configs in the ${ACROCONFROOT} directory as 'add-website.conf':"
+  >&2 echo "i.e:"
+  >&2 echo "  cd ${ACROCONFROOT} && sudo ln -s 'add-website.conf.php7.2' 'add-website.conf'"
+  >&2 echo "or"
+  >&2 echo "  cd ${ACROCONFROOT} && sudo ln -s 'add-website.conf.php5' 'add-website.conf'"
+  >&2 echo "If you DID specify a PHP version, it means the version you specified isn't supported or doesn't exist."
+  exit 92
+}
+source "${ACROCONF}"
+
+>&2 printf "HTTP daemon to use.......: %b%s%b\n" "${BLUE}" "${WEBSERVER}" "${NC}"
+if [[ "$PHP_VERSION" == 'none' ]]; then
+  >&2 printf "PHP FPM version to use...: %b%s%b\n" "${RED}" "${PHP_VERSION}" "${NC}        (specify a different version with: --php-version X.X)"
+else
+  >&2 printf "PHP FPM version to use...: %b%s%b\n" "${BLUE}" "${PHP_VERSION}" "${NC}        (specify a different version with: --php-version X.X)"
+fi
+>&2 printf "\n"
+
+ACTIVITY_LOG="/var/log/acro-add-website.log"
+
 
 
 
