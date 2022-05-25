@@ -60,3 +60,4 @@
           - rsync
           - make
           - findutils
+          - sudo

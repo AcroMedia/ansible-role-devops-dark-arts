@@ -24,7 +24,7 @@ set -o pipefail
 # Run it remotely over SSH:
 #   ssh USER@SERVER 'sudo bash -s' < ./passwordless-sudo.sh sudo     # Group on Ubuntu
 #   ssh USER@SERVER 'sudo bash -s' < ./passwordless-sudo.sh wheel    # Group on RedHat
-#   ssh USER@SERVER 'sudo bash -s' < ./passwordless-sudo.sh johndoe  # Individual on either OS 
+#   ssh USER@SERVER 'sudo bash -s' < ./passwordless-sudo.sh johndoe  # Individual on either OS
 ###############################################################################
 
 SUDOERS="/etc/sudoers"
@@ -66,7 +66,11 @@ function main () {
 
 
   # Make sure the line exists in /etc/sudoers that's actually going to include the file we create.
-  if ! grep -qx "#includedir ${INCLUDEDIR}" "$SUDOERS"; then
+  if grep -qx "^@includedir ${INCLUDEDIR}" "$SUDOERS"; then  # Sudo >= 1.9.2
+    true  # The line starts with an @ symbol on >= 22.04
+  elif grep -qx "^#includedir ${INCLUDEDIR}" "$SUDOERS"; then  # Sudo < 1.9.2
+    true  # The line starts with a hash symbol on <= 20.04
+  else
     err "The file '${SUDOERS}' does not include files from '${INCLUDEDIR}'."
     cerr "The sudoers file must be adjusted with visudo before this script can be used."
     exit 1
