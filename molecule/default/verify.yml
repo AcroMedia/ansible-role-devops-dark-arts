@@ -2,6 +2,13 @@
 - name: Check if scripts are deployed
   hosts: all
   become: yes
+  gather_facts: yes
+
+  vars:
+    by_fam:
+      sudo_grp:
+        Debian: sudo
+        RedHat: wheel
 
   tasks:
     - name: Gather info about aau add-user conf
@@ -21,3 +28,4 @@
         - mv /etc/acro/add-user.data.example /etc/acro/add-user.data
         - /usr/local/sbin/acro-add-user.sh pparker
         - /usr/local/sbin/acro-add-user.sh bwayne
+        - /usr/local/sbin/passwordless-sudo.sh {{ by_fam.sudo_grp[ansible_os_family] }}
