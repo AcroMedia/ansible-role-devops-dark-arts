@@ -355,19 +355,7 @@ function sanity_checks_pass () {
     : # OK
   elif [[ "${PHP_VERSION}" == "5" ]]; then
      : # OK
-  elif  [[ "${PHP_VERSION}" == "5.6" ]]; then
-     : # OK
-  elif  [[ "${PHP_VERSION}" == "7.0" ]]; then
-     : # OK
-  elif  [[ "${PHP_VERSION}" == "7.1" ]]; then
-     : # OK
-  elif  [[ "${PHP_VERSION}" == "7.2" ]]; then
-     : # OK
-  elif  [[ "${PHP_VERSION}" == "7.3" ]]; then
-     : # OK
-  elif  [[ "${PHP_VERSION}" == "7.4" ]]; then
-    : # OK
-  elif  [[ "${PHP_VERSION}" == "8.0" ]]; then
+  elif [[ "$PHP_VERSION" =~ [0-9].[0-9] ]]; then
     : # OK
   else
     cerr "${BOLD}ERR:${UNBOLD} This script isn't built to handle a PHP_VERSION value of: $PHP_VERSION"
@@ -377,7 +365,7 @@ function sanity_checks_pass () {
 
   if [[ "$PHP_VERSION" != 'none' ]]; then
     echo "$PACKAGELIST" | grep -q -- "php${PHP_VERSION}-fpm" || {
-       warn "This script only supports PHP ${PHP_VERSION}, which doesn't seem to be installed. Proceed at your own risk."
+       warn "PHP ${PHP_VERSION} doesn't seem to be installed. Your site may not work."
     }
     for PKG in bcmath cli common curl fpm gd json mbstring mysql opcache readline soap xml xmlrpc zip; do
       echo "$PACKAGELIST" | grep -q -- "ii  php${PHP_VERSION}-${PKG}" || {
@@ -460,8 +448,7 @@ function sanity_checks_pass () {
     exit 254
   }
   service postfix status > /dev/null || {
-    cerr "${BOLD}ERR:${UNBOLD} Could not get postfix status"
-    exit 254
+    cerr "${BOLD}WARN:${UNBOLD} Could not get postfix status"
   }
 
   # Figure out which shell to set to set for PHP service user
@@ -1403,9 +1390,20 @@ export VHOST_CONF_STUB
 
 if [ $# -gt 0 ] && /usr/local/bin/optional-parameter-exists "--php-version" "$@"; then
   PHP_VERSION="$(/usr/local/bin/require-named-parameter "--php-version" "$@")"
-  readonly ACROCONF="${ACROCONFROOT}/add-website.conf.php${PHP_VERSION}"
+fi
+
+if [ -n "${PHP_VERSION:-}" ]; then
+  if [ -e "${ACROCONFROOT}/add-website.conf${PHP_VERSION}" ]; then
+    ACROCONF="${ACROCONFROOT}/add-website.conf${PHP_VERSION}"
+  else
+    ACROCONF="${ACROCONFROOT}/add-website.conf.phpdefault"
+  fi
 else
-  readonly ACROCONF="${ACROCONFROOT}/add-website.conf"
+  if [ -e "${ACROCONFROOT}/add-website.conf" ]; then
+    ACROCONF="${ACROCONFROOT}/add-website.conf"
+  else
+    ACROCONF="${ACROCONFROOT}/add-website.conf.phpdefault"
+  fi
 fi
 
 test -e "${ACROCONF}" || {
@@ -1416,6 +1414,10 @@ test -e "${ACROCONF}" || {
   >&2 echo "  cd ${ACROCONFROOT} && sudo ln -s 'add-website.conf.php7.2' 'add-website.conf'"
   >&2 echo "or"
   >&2 echo "  cd ${ACROCONFROOT} && sudo ln -s 'add-website.conf.php5' 'add-website.conf'"
+  >&2 echo "or"
+  >&2 echo "  cd ${ACROCONFROOT} && sudo ln -s 'add-website.conf.phpdefault' 'add-website.conf'"
+  >&2 echo "or"
+  >&2 echo "  cd ${ACROCONFROOT} && sudo ln -s 'add-website.conf.phpdnone' 'add-website.conf'"
   >&2 echo "If you DID specify a PHP version, it means the version you specified isn't supported or doesn't exist."
   exit 92
 }
