@@ -1,0 +1,22 @@
+## How to build
+
+Back up into the parent directory to build this, since it copies the repo into the dockerfile.
+
+E.g.:
+```
+cd ../
+docker build -t acromedia/aaw-tester:php81 -f tests/Dockerfile .
+```
+
+## How to test
+
+For example, acro-add-website.sh:
+```
+docker run -it acromedia/aaw-tester:php81 /root/ansible-role-devops-utils/scripts/deployables/acro-add-website.sh \
+  --skip-mysql \
+  --account foo \
+  --project bar \
+  --fqdn foobar.exapmle.com \
+  --webroot wwwroot \
+  --responsible-person root
+```

@@ -1,0 +1,49 @@
+#!/bin/bash
+# White space is not trivial.
+# This file lives inside $ACROCONFROOT, and is sourced by acro-add-website.sh, and acro-remove-website.sh.
+
+if [ -z ${PHP_VERSION:-} ]; then
+  PHP_VERSION="$(set -eu -o pipefail && php -v | grep ^PHP | cut -d' ' -f2 | cut -d '.' -f 1,2)" # If PHP_VERSION version hasn't been defined yet, set it from the default installed version.
+fi
+PHP_FPM_SERVICE_NAME="php${PHP_VERSION}-fpm"
+readonly PHP_FPM_LOGROTATE_POSTROTATE="/usr/lib/php/php${PHP_VERSION}-fpm-reopenlogs"
+readonly VHOSTLOGROOT="/var/log/vhosts"
+readonly HOMEROOT="/home"
+if [ -d "/etc/nginx/sites-available" ] \
+  && [ -d "/etc/nginx/sites-enabled" ]; then
+    # Probalby Debian/Ubuntu
+  NGINX_SITES_AVAILABLE="/etc/nginx/sites-available"
+  NGINX_SITES_ENABLED="/etc/nginx/sites-enabled"
+elif [ -d "/etc/nginx/conf.d" ] \
+  && [ ! -d "/etc/nginx/sites-available" ] \
+  && [ ! -d "/etc/nginx/sites-enabled" ]; then
+    # Probalby RedHat / CentOS
+  NGINX_SITES_AVAILABLE="/etc/nginx/conf.d"
+  NGINX_SITES_ENABLED="/tmp" # Throwaway. Adding a site to conf.d doensn't require a symlink to enable it.
+else
+  >&2 echo "I don't know where to create nginx configs. Manual intervention is required in /etc/acro/add-website.conf.php${PHP_VERSION}."
+  exit 1
+fi
+readonly APACHE_SITES_AVAILABLE="/etc/apache2/sites-available"
+readonly APACHE_SITES_ENABLED="/etc/apache2/sites-enabled"
+readonly NGINX_CONF_TEMPLATE="$ACROCONFROOT/nginx-vhost-template-d7${VHOST_CONF_STUB}-conf.j2"
+readonly APACHE_CONF_TEMPLATE="$ACROCONFROOT/apache-vhost-template-d7${VHOST_CONF_STUB}-conf.j2"
+SSLDIR="/usr/local/ssl"
+readonly CERTSDIR="$SSLDIR/certs"
+readonly KEYSDIR="$SSLDIR/private"
+POOLDIR="/etc/php/${PHP_VERSION}/fpm/pool.d"
+if [ -e "$ACROCONFROOT/php${PHP_VERSION}-fpm-pool-conf-template.j2" ]; then
+  FPM_CONF_TEMPLATE="$ACROCONFROOT/php${PHP_VERSION}-fpm-pool-conf-template.j2"
+else
+  FPM_CONF_TEMPLATE="$ACROCONFROOT/php-fpm-pool-conf-template.j2"
+fi
+
+readonly SETTINGS_LOCAL_TEMPLATE="$ACROCONFROOT/drupal-settings-local-php.j2"
+readonly AUTODEPLOY_HOOKS_SRC="/usr/local/src/acro/auto-deploy-git-hooks"
+readonly PRE_RECEIVE_SRC="$AUTODEPLOY_HOOKS_SRC/remote-node/pre-receive"
+readonly POST_RECEIVE_SRC="$AUTODEPLOY_HOOKS_SRC/remote-node/post-receive"
+readonly MAX_ACCOUNT_STRING_LENGTH=32
+readonly MAX_MYSQL_DBNAME_LENGTH=64
+readonly MAX_MYSQL_USERNAME_LENGTH=16
+readonly LOGROTATE_CONF_TEMPLATE="$ACROCONFROOT/logrotate.d-vhost.j2"
+readonly WEBSERVER_PROCESS_OWNER="www-data" # Ubuntu only. Will be 'apache' if this ever runs on red hat.
