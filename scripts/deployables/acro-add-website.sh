@@ -301,6 +301,10 @@ function main () {
   cerr ""
   cerr "Log files: "
   cerr "- Server and PHP-FPM logs are at $REAL_LOG_DIR"
+  if [ $WARNINGS -gt 0 ]; then
+  cerr ""
+  cerr "${BOLD}THERE WERE ${WARNINGS} WARNING(S) WHILE CREATING YOUR SITE. PLEASE REVIEW THE OUTPUT ABOVE BEFORE CONTINUING.${UNBOLD}"
+  fi
 
 }
 
@@ -448,7 +452,7 @@ function sanity_checks_pass () {
     exit 254
   }
   service postfix status > /dev/null || {
-    cerr "${BOLD}WARN:${UNBOLD} Could not get postfix status"
+    warn "Could not get postfix status"
   }
 
   # Figure out which shell to set to set for PHP service user
@@ -1278,8 +1282,10 @@ function prompt_for_value_with_default() {
   echo "$VARIABLE_VALUE"
 }
 
+WARNINGS=0
 function warn () {
   cerr "${BOLD}Warn:${UNBOLD} $*"
+  WARNINGS=$((WARNINGS+1))
 }
 
 function cerr () {
