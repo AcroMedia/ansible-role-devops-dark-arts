@@ -826,7 +826,7 @@ function add_pubkey_key_to_all_web_accounts () {
       continue
     fi
     local WEB_FILE_COUNT
-    WEB_FILE_COUNT="$(find "$HOMEDIR/www"  -maxdepth 3 -type f \( -name '*.php' -o -name '*.htm' -o -name '*.html' \) -printf '.'|wc -c)"
+    WEB_FILE_COUNT="$(find -L "$HOMEDIR/www"  -maxdepth 3 -type f \( -name '*.php' -o -name '*.htm' -o -name '*.html' \) -printf '.'|wc -c)"
     if ! is_positive_integer "$WEB_FILE_COUNT"; then
       info "Skipping $HOMEDIR because WEB_FILE_COUNT was not a positive integer: $WEB_FILE_COUNT"
       continue
