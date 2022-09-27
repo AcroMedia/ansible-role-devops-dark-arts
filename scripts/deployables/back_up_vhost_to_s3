@@ -66,7 +66,7 @@ function main () {
   for DB_NAME in ${DATABASES:-}; do
     S3_DEST="${BUCKET}${SERVER_AND_DATE}.db.$DB_NAME.sql.gz"
     back_up_database_to_s3 "$DB_NAME" "$S3_DEST"
-    DBS_BACKED=$((DBS_BACKED+1))_
+    DBS_BACKED=$((DBS_BACKED+1))
   done
 
   cerr "Directories backed up: $DIRS_BACKED"
