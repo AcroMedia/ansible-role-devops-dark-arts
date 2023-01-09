@@ -586,7 +586,7 @@ function main() {
       fi
 
 
-      if [ $GRANT_WEBS -eq 1 ]; then
+      if [ "$GRANT_WEBS" -eq 1 ]; then
         # Add user to existing web accounts, whether in "add" or "update" mode.
         add_pubkey_key_to_all_web_accounts "$KEYOWNER" "$PUBKEY" "$NEW_AUTH_LINE"
       fi
