@@ -27,19 +27,16 @@ jobs:
     strategy:
       matrix:
         image:
-          - geerlingguy/docker-ubuntu2204-ansible:latest
-          - geerlingguy/docker-ubuntu2004-ansible:latest
-          - geerlingguy/docker-ubuntu1804-ansible:latest
-          - geerlingguy/docker-ubuntu1604-ansible:latest
-          - geerlingguy/docker-centos8-ansible:latest
-          - geerlingguy/docker-centos7-ansible:latest
+          - registry.gitlab.com/aussielunix/ansible/molecule-containers/ubuntu:jammy
+          - registry.gitlab.com/aussielunix/ansible/molecule-containers/ubuntu:focal
+          - registry.gitlab.com/aussielunix/ansible/molecule-containers/rockylinux:9
     steps:
       - name: checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           path: "${{ github.repository }}"
       - name: molecule
-        uses: robertdebock/molecule-action@2.6.3
+        uses: robertdebock/molecule-action@4.0.9
         with:
           image: "${{ matrix.image }}"
           options: parallel
