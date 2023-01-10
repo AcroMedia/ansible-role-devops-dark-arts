@@ -1,5 +1,7 @@
 ---
 galaxy_info:
+  namespace: acromedia
+  role_name: devops_utils
   author: Dale Anderson
   description: A collection of shell scripts and hacks intended to make life easier for Acro Media sysadmins and developers
   company: Acro Media Inc.
