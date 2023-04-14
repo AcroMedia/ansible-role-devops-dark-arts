@@ -23,11 +23,18 @@ function main () {
   if [ -z "${BUCKET:-}" ]; then
     cerr ''
     err 'Missing required BUCKET environment variable.'
-    cerr "Required format: (1) the protocol, (2) the bucket name, (3) the trailing slash, and (4) and if desired, a name-prefix that files will prepended to all file names."
-    cerr "Examples:"
-    cerr "  export BUCKET=s3://my-archival-s3-bucket/"
-    cerr "  export BUCKET=s3://my-archival-s3-bucket/purposeful-prefix"
+    bucket_usage
+  fi
+
+  # Make sure bucket string conforms to "s3://(mandatory)/(optional)". It's EASY to miss that ending slash.
+  # when not specifying the filename prefix, and not obvious why the upload fails.
+  if echo "${BUCKET}" | awk '/^s3:\/\/[^\/]+\/[^/]*$/' | grep . > /dev/null ; then
+    true
+  else
     cerr ''
+    err "Badly formed BUCKET value: '${BUCKET}'"
+    bucket_usage
+    exit 1
   fi
 
   if [ -z "${DIRECTORIES:-}" ]; then
@@ -57,7 +64,7 @@ function main () {
     REL_DIR=$(echo -n "$ABS_DIR" | sed -e 's/^\///')
     NO_SLASHES=$(echo -n "$REL_DIR" | tr --complement '[:alnum:]' '-')
     S3_DEST="${BUCKET}${SERVER_AND_DATE}.dir.$NO_SLASHES.tgz"
-    back_up_directory_to_s3 "$ABS_DIR" "$S3_DEST"
+    (set -x && back_up_directory_to_s3 "$ABS_DIR" "$S3_DEST")
     DIRS_BACKED=$((DIRS_BACKED+1))
   done
 
@@ -65,7 +72,7 @@ function main () {
   DBS_BACKED=0
   for DB_NAME in ${DATABASES:-}; do
     S3_DEST="${BUCKET}${SERVER_AND_DATE}.db.$DB_NAME.sql.gz"
-    back_up_database_to_s3 "$DB_NAME" "$S3_DEST"
+    (set -x && back_up_database_to_s3 "$DB_NAME" "$S3_DEST")
     DBS_BACKED=$((DBS_BACKED+1))
   done
 
@@ -74,6 +81,22 @@ function main () {
 
 }
 
+function bucket_usage () {
+  cerr ''
+  cerr "Required format:"
+  cerr "  s3://<bucket-name>/<filename-prefix>"
+  cerr 'Or:'
+  cerr "  s3://<bucket-name>/      # <-- If not providing a prefix, you must terminate the bucket name with a slash"
+  cerr ''
+  cerr "Examples:"
+  cerr "  export BUCKET=s3://my-archival-s3-bucket/my-purposeful-prefix-"
+  cerr "  export BUCKET=s3://my-archival-s3-bucket/"
+  cerr ''
+  cerr "Filename prefixes lexically group backed up objects together in the S3 bucket."
+  cerr "When providing a filename prefix, it's helpful to end it with a dot, dash, underscore for readability."
+  cerr "Unless you're backing up a single file or database, you should always provide a prefix."
+  cerr ''
+}
 
 ERRORS=0
 function err () {

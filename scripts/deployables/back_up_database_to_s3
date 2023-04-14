@@ -101,7 +101,7 @@ function main () {
   S3_ARCHIVE_CONTAINER=$(dirname "$S3_ARCHIVE_DEST")
 
   #  Try writing to the container first; if its a sub-directory that doesnt exist yet, this will create it and keep the filtered_list test from failing.
-  if ! (echo "write-test" | aws s3 cp - "${S3_ARCHIVE_CONTAINER}/._write_permissions_test"); then
+  if ! (echo "write-test $S3_ARCHIVE_DEST $(date +%s)" | aws s3 cp - "${S3_ARCHIVE_CONTAINER}/._write_permissions_test"); then
     cerr ''
     cerr "The test to see if we can write to ${S3_ARCHIVE_CONTAINER} failed."
     cerr "Check for misspellings, make sure you have bucket read/write permissions, and try again."
@@ -118,7 +118,7 @@ function main () {
     cerr '✘'
     exit 1
   }
-  FILTERED_LIST=$(echo "$BUCKET_LIST" | grep -ow "$S3_ARCHIVE_FILENAME") || true
+  FILTERED_LIST=$(echo "$BUCKET_LIST" | grep -ow "$S3_ARCHIVE_FILENAME\$") || true
   if [[ "$FILTERED_LIST" == "$S3_ARCHIVE_FILENAME" ]]; then
     err "S3 archive already exists: ${S3_ARCHIVE_DEST}"
     cerr "Remove the old archive, or specify a different destination name."
