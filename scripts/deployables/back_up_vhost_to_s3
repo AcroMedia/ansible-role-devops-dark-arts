@@ -21,39 +21,36 @@ function main () {
   fi
 
   if [ -z "${BUCKET:-}" ]; then
-    cerr ''
     err 'Missing required BUCKET environment variable.'
     bucket_usage
-  fi
-
-  # Make sure bucket string conforms to "s3://(mandatory)/(optional)". It's EASY to miss that ending slash.
-  # when not specifying the filename prefix, and not obvious why the upload fails.
-  if echo "${BUCKET}" | awk '/^s3:\/\/[^\/]+\/[^/]*$/' | grep . > /dev/null ; then
-    true
   else
-    cerr ''
-    err "Badly formed BUCKET value: '${BUCKET}'"
-    bucket_usage
-    exit 1
+    # Make sure bucket string conforms to "s3://(mandatory)/(optional)". It's EASY to miss that ending slash.
+    # when not specifying the filename prefix, and not obvious why the upload fails.
+    if echo "${BUCKET}" | awk '/^s3:\/\/[^\/]+\/[^/]*$/' | grep . > /dev/null ; then
+      true
+    else
+      err "Badly formed BUCKET value: '${BUCKET}'"
+      bucket_usage
+    fi
   fi
 
   if [ -z "${DIRECTORIES:-}" ]; then
     warn "DIRECTORIES should be a quoted list of space-separated absolute directory names."
-    cerr "Example:"
-    cerr "  export DIRECTORIES='/home/bigcorp /etc /usr/local/ssl'"
+    cerr "  Example:"
+    cerr "    export DIRECTORIES='/home/bigcorp /etc /usr/local/ssl'"
     cerr ''
   fi
 
   if [ -z "${DATABASES:-}" ]; then
     warn "DATABASES should be a quoted list of space-separated database names."
-    cerr "Example:"
-    cerr "  export DATABASES='bigcorpstore bigcorpblog mysql'"
+    cerr "  Example:"
+    cerr "    export DATABASES='bigcorpstore bigcorpblog mysql'"
     cerr ''
   fi
 
   if [ "$ERRORS" -gt 0 ]; then
     cerr '✘'
-    exit "$ERRORS"
+    exit 1
   fi
 
   SERVER_AND_DATE="$(hostname -f).$(date --iso-8601)"
@@ -82,19 +79,18 @@ function main () {
 }
 
 function bucket_usage () {
-  cerr ''
-  cerr "Required format:"
-  cerr "  s3://<bucket-name>/<filename-prefix>"
-  cerr 'Or:'
-  cerr "  s3://<bucket-name>/      # <-- If not providing a prefix, you must terminate the bucket name with a slash"
-  cerr ''
-  cerr "Examples:"
-  cerr "  export BUCKET=s3://my-archival-s3-bucket/my-purposeful-prefix-"
-  cerr "  export BUCKET=s3://my-archival-s3-bucket/"
-  cerr ''
-  cerr "Filename prefixes lexically group backed up objects together in the S3 bucket."
-  cerr "When providing a filename prefix, it's helpful to end it with a dot, dash, underscore for readability."
-  cerr "Unless you're backing up a single file or database, you should always provide a prefix."
+  cerr "  Required BUCKET format:"
+  cerr "    s3://<bucket-name>/<filename-prefix>"
+  cerr '  Or:'
+  cerr "    s3://<bucket-name>/      # <-- If not providing a prefix, you must terminate the bucket name with a slash"
+  cerr '  '
+  cerr "  Examples:"
+  cerr "    export BUCKET=s3://my-archival-s3-bucket/my-purposeful-prefix-   # <-- Note trailing dash"
+  cerr "    export BUCKET=s3://my-archival-s3-bucket/"
+  cerr '  '
+  cerr "  BUCKET Filename Prefixes lexically group backed up objects together in the S3 bucket."
+  cerr "  When providing a filename prefix, it's helpful to end it with a dot, dash, underscore for readability."
+  cerr "  Unless you're backing up a single file or database, you should always provide a prefix."
   cerr ''
 }
 
